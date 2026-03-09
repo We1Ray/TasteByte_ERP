@@ -1,0 +1,260 @@
+use axum::extract::State;
+use axum::middleware as axum_mw;
+use axum::routing::get;
+use axum::Json;
+use axum::Router;
+use rust_decimal::Decimal;
+use serde::Serialize;
+
+use crate::middleware::metrics::track_metrics;
+use crate::shared::types::{AppState, Claims};
+use crate::shared::{ApiResponse, AppError};
+
+pub fn build_router(state: AppState) -> Router {
+    let api = Router::new()
+        .route("/dashboard/kpis", get(dashboard_kpis))
+        .route("/dashboard/charts", get(dashboard_charts))
+        .nest("/auth", crate::auth::routes::routes())
+        .nest("/fi", crate::fi::routes::routes())
+        .nest("/co", crate::co::routes::routes())
+        .nest("/mm", crate::mm::routes::routes())
+        .nest("/sd", crate::sd::routes::routes())
+        .nest("/pp", crate::pp::routes::routes())
+        .nest("/hr", crate::hr::routes::routes())
+        .nest("/wm", crate::wm::routes::routes())
+        .nest("/qm", crate::qm::routes::routes())
+        .nest("/lowcode", crate::lowcode::routes::routes())
+        .nest("/notifications", crate::notifications::routes::routes())
+        .route(
+            "/workflow/history/{doc_type}/{doc_id}",
+            get(crate::shared::handlers::get_status_history),
+        );
+
+    Router::new()
+        .nest("/api/v1", api)
+        .route("/health", get(health_check))
+        .route("/metrics", get(metrics_endpoint))
+        .layer(axum_mw::from_fn(track_metrics))
+        .with_state(state)
+}
+
+async fn health_check(
+    State(state): State<AppState>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
+    let db_ok = sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&state.pool)
+        .await
+        .is_ok();
+
+    let pool_size = state.pool.size();
+    let pool_idle = state.pool.num_idle();
+    let pool_info = serde_json::json!({
+        "active_connections": pool_size - pool_idle as u32,
+        "idle_connections": pool_idle,
+        "max_connections": state.pool.options().get_max_connections(),
+    });
+
+    if db_ok {
+        Ok(axum::Json(serde_json::json!({
+            "status": "ok",
+            "service": "TasteByte ERP Backend",
+            "version": env!("CARGO_PKG_VERSION"),
+            "database": "connected",
+            "pool": pool_info
+        })))
+    } else {
+        Err((
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            axum::Json(serde_json::json!({
+                "status": "degraded",
+                "service": "TasteByte ERP Backend",
+                "version": env!("CARGO_PKG_VERSION"),
+                "database": "disconnected",
+                "pool": pool_info
+            })),
+        ))
+    }
+}
+
+async fn metrics_endpoint(State(state): State<AppState>) -> String {
+    state.metrics_handle.render()
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct DashboardKpi {
+    pub total_revenue: Decimal,
+    pub total_order_count: i64,
+    pub total_inventory_quantity: Decimal,
+    pub pending_production_orders: i64,
+    pub open_ar_amount: Decimal,
+    pub open_ap_amount: Decimal,
+}
+
+async fn query_total_revenue(pool: &sqlx::PgPool) -> Result<Decimal, AppError> {
+    let (val,): (Decimal,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(ji.credit_amount), 0) \
+         FROM fi_journal_items ji \
+         JOIN fi_accounts a ON a.id = ji.account_id \
+         JOIN fi_journal_entries je ON je.id = ji.journal_entry_id \
+         WHERE a.account_type = 'REVENUE' AND je.status = 'POSTED'",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(val)
+}
+
+async fn query_total_orders(pool: &sqlx::PgPool) -> Result<i64, AppError> {
+    let (val,): (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM sd_sales_orders WHERE status != 'CANCELLED'")
+            .fetch_one(pool)
+            .await?;
+    Ok(val)
+}
+
+async fn query_total_inventory(pool: &sqlx::PgPool) -> Result<Decimal, AppError> {
+    let (val,): (Decimal,) =
+        sqlx::query_as("SELECT COALESCE(SUM(quantity), 0) FROM mm_plant_stock")
+            .fetch_one(pool)
+            .await?;
+    Ok(val)
+}
+
+async fn query_pending_production(pool: &sqlx::PgPool) -> Result<i64, AppError> {
+    let (val,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM pp_production_orders WHERE status IN ('CREATED', 'PLANNED', 'IN_PROGRESS')",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(val)
+}
+
+async fn query_open_ar(pool: &sqlx::PgPool) -> Result<Decimal, AppError> {
+    let (val,): (Decimal,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total_amount - paid_amount), 0) \
+         FROM fi_ar_invoices WHERE status NOT IN ('PAID', 'CANCELLED')",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(val)
+}
+
+async fn query_open_ap(pool: &sqlx::PgPool) -> Result<Decimal, AppError> {
+    let (val,): (Decimal,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total_amount - paid_amount), 0) \
+         FROM fi_ap_invoices WHERE status NOT IN ('PAID', 'CANCELLED')",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(val)
+}
+
+async fn dashboard_kpis(
+    State(state): State<AppState>,
+    _claims: Claims,
+) -> Result<Json<ApiResponse<DashboardKpi>>, AppError> {
+    let (
+        total_revenue,
+        total_order_count,
+        total_inventory_quantity,
+        pending_production_orders,
+        open_ar_amount,
+        open_ap_amount,
+    ) = tokio::try_join!(
+        query_total_revenue(&state.pool),
+        query_total_orders(&state.pool),
+        query_total_inventory(&state.pool),
+        query_pending_production(&state.pool),
+        query_open_ar(&state.pool),
+        query_open_ap(&state.pool),
+    )?;
+
+    Ok(Json(ApiResponse::success(DashboardKpi {
+        total_revenue,
+        total_order_count,
+        total_inventory_quantity,
+        pending_production_orders,
+        open_ar_amount,
+        open_ap_amount,
+    })))
+}
+
+#[derive(Serialize)]
+pub struct DashboardCharts {
+    pub monthly_revenue: Vec<MonthlyRevenue>,
+    pub monthly_orders: Vec<MonthlyOrders>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct MonthlyRevenue {
+    pub month: String,
+    pub revenue: Decimal,
+    pub costs: Decimal,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct MonthlyOrders {
+    pub month: String,
+    pub orders: i64,
+    pub delivered: i64,
+}
+
+async fn dashboard_charts(
+    State(state): State<AppState>,
+    _claims: Claims,
+) -> Result<Json<ApiResponse<DashboardCharts>>, AppError> {
+    // Get monthly revenue from posted journal entries (last 6 months)
+    let monthly_revenue: Vec<MonthlyRevenue> = sqlx::query_as(
+        r#"WITH months AS (
+            SELECT TO_CHAR(d, 'Mon') as month, EXTRACT(MONTH FROM d)::int as month_num,
+                   EXTRACT(YEAR FROM d)::int as year_num
+            FROM generate_series(
+                DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months'),
+                DATE_TRUNC('month', CURRENT_DATE),
+                '1 month'
+            ) d
+        )
+        SELECT m.month,
+            COALESCE(SUM(CASE WHEN a.account_type = 'REVENUE' THEN ji.credit_amount ELSE 0 END), 0) as revenue,
+            COALESCE(SUM(CASE WHEN a.account_type = 'EXPENSE' THEN ji.debit_amount ELSE 0 END), 0) as costs
+        FROM months m
+        LEFT JOIN fi_journal_entries je ON EXTRACT(MONTH FROM je.posting_date) = m.month_num
+            AND EXTRACT(YEAR FROM je.posting_date) = m.year_num
+            AND je.status = 'POSTED'
+        LEFT JOIN fi_journal_items ji ON ji.journal_entry_id = je.id
+        LEFT JOIN fi_accounts a ON a.id = ji.account_id AND a.account_type IN ('REVENUE', 'EXPENSE')
+        GROUP BY m.month, m.month_num, m.year_num
+        ORDER BY m.year_num, m.month_num"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
+    // Get monthly order counts (last 6 months)
+    let monthly_orders: Vec<MonthlyOrders> = sqlx::query_as(
+        r#"WITH months AS (
+            SELECT TO_CHAR(d, 'Mon') as month, EXTRACT(MONTH FROM d)::int as month_num,
+                   EXTRACT(YEAR FROM d)::int as year_num
+            FROM generate_series(
+                DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months'),
+                DATE_TRUNC('month', CURRENT_DATE),
+                '1 month'
+            ) d
+        )
+        SELECT m.month,
+            COUNT(CASE WHEN so.id IS NOT NULL THEN 1 END) as orders,
+            COUNT(CASE WHEN so.status IN ('DELIVERED', 'COMPLETED', 'INVOICED') THEN 1 END) as delivered
+        FROM months m
+        LEFT JOIN sd_sales_orders so ON EXTRACT(MONTH FROM so.order_date) = m.month_num
+            AND EXTRACT(YEAR FROM so.order_date) = m.year_num
+            AND so.status != 'CANCELLED'
+        GROUP BY m.month, m.month_num, m.year_num
+        ORDER BY m.year_num, m.month_num"#,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(ApiResponse::success(DashboardCharts {
+        monthly_revenue,
+        monthly_orders,
+    })))
+}

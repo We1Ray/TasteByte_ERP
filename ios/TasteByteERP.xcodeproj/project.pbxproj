@@ -1,0 +1,710 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000001 /* TasteByteERPApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001; };
+		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000002; };
+		AA000003 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000003; };
+		AA000004 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000004; };
+		AA000005 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000005; };
+		AA000006 /* Date+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000006; };
+		AA000007 /* APIResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000007; };
+		AA000008 /* Attendance.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000008; };
+		AA000009 /* Employee.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000009; };
+		AA000010 /* InspectionLot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010; };
+		AA000011 /* Material.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011; };
+		AA000012 /* ProductionOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012; };
+		AA000013 /* PurchaseOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000013; };
+		AA000014 /* SalesOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000014; };
+		AA000015 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000015; };
+		AA000016 /* Warehouse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000016; };
+		AA000017 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000017; };
+		AA000018 /* APIEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000018; };
+		AA000019 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000019; };
+		AA000020 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000020; };
+		AA000021 /* LoginViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000021; };
+		AA000022 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000022; };
+		AA000023 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000023; };
+		AA000024 /* KPICardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000024; };
+		AA000025 /* AttendanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000025; };
+		AA000026 /* EmployeeListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000026; };
+		AA000027 /* HRViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000027; };
+		AA000028 /* MaterialDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000028; };
+		AA000029 /* MaterialsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000029; };
+		AA000030 /* MaterialsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000030; };
+		AA000031 /* StockOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000031; };
+		AA000032 /* ProductionOrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000032; };
+		AA000033 /* ProductionOrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000033; };
+		AA000034 /* ProductionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000034; };
+		AA000035 /* PurchaseOrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000035; };
+		AA000036 /* PurchaseOrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000036; };
+		AA000037 /* PurchaseOrderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000037; };
+		AA000038 /* InspectionFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000038; };
+		AA000039 /* InspectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000039; };
+		AA000040 /* QualityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000040; };
+		AA000041 /* FIReportsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000041; };
+		AA000042 /* MMReportsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000042; };
+		AA000043 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000043; };
+		AA000044 /* ReportsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000044; };
+		AA000045 /* SDReportsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000045; };
+		AA000046 /* SalesOrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000046; };
+		AA000047 /* SalesOrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000047; };
+		AA000048 /* SalesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000048; };
+		AA000049 /* StockCountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000049; };
+		AA000050 /* WarehouseListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000050; };
+		AA000051 /* WarehouseViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000051; };
+		AA000052 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000052; };
+		AA000053 /* ERPCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000053; };
+		AA000054 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000054; };
+		AA000055 /* SearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000055; };
+		AA000056 /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000056; };
+		AA000057 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000057; };
+		AA000058 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000058; };
+		AA000059 /* OfflineSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000059; };
+		AA000060 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000060; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AC000001 /* TasteByteERP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TasteByteERP.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000001 /* TasteByteERPApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasteByteERPApp.swift; sourceTree = "<group>"; };
+		AB000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AB000003 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		AB000004 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		AB000005 /* Color+Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
+		AB000006 /* Date+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Formatting.swift"; sourceTree = "<group>"; };
+		AB000007 /* APIResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIResponse.swift; sourceTree = "<group>"; };
+		AB000008 /* Attendance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attendance.swift; sourceTree = "<group>"; };
+		AB000009 /* Employee.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Employee.swift; sourceTree = "<group>"; };
+		AB000010 /* InspectionLot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionLot.swift; sourceTree = "<group>"; };
+		AB000011 /* Material.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Material.swift; sourceTree = "<group>"; };
+		AB000012 /* ProductionOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOrder.swift; sourceTree = "<group>"; };
+		AB000013 /* PurchaseOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseOrder.swift; sourceTree = "<group>"; };
+		AB000014 /* SalesOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalesOrder.swift; sourceTree = "<group>"; };
+		AB000015 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		AB000016 /* Warehouse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Warehouse.swift; sourceTree = "<group>"; };
+		AB000017 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		AB000018 /* APIEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoints.swift; sourceTree = "<group>"; };
+		AB000019 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+		AB000020 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		AB000021 /* LoginViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewModel.swift; sourceTree = "<group>"; };
+		AB000022 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		AB000023 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		AB000024 /* KPICardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KPICardView.swift; sourceTree = "<group>"; };
+		AB000025 /* AttendanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendanceView.swift; sourceTree = "<group>"; };
+		AB000026 /* EmployeeListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeListView.swift; sourceTree = "<group>"; };
+		AB000027 /* HRViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HRViewModel.swift; sourceTree = "<group>"; };
+		AB000028 /* MaterialDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialDetailView.swift; sourceTree = "<group>"; };
+		AB000029 /* MaterialsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsListView.swift; sourceTree = "<group>"; };
+		AB000030 /* MaterialsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialsViewModel.swift; sourceTree = "<group>"; };
+		AB000031 /* StockOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockOverviewView.swift; sourceTree = "<group>"; };
+		AB000032 /* ProductionOrderDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOrderDetailView.swift; sourceTree = "<group>"; };
+		AB000033 /* ProductionOrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOrdersView.swift; sourceTree = "<group>"; };
+		AB000034 /* ProductionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionViewModel.swift; sourceTree = "<group>"; };
+		AB000035 /* PurchaseOrderDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseOrderDetailView.swift; sourceTree = "<group>"; };
+		AB000036 /* PurchaseOrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseOrdersView.swift; sourceTree = "<group>"; };
+		AB000037 /* PurchaseOrderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseOrderViewModel.swift; sourceTree = "<group>"; };
+		AB000038 /* InspectionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionFormView.swift; sourceTree = "<group>"; };
+		AB000039 /* InspectionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionListView.swift; sourceTree = "<group>"; };
+		AB000040 /* QualityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityViewModel.swift; sourceTree = "<group>"; };
+		AB000041 /* FIReportsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FIReportsViews.swift; sourceTree = "<group>"; };
+		AB000042 /* MMReportsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMReportsViews.swift; sourceTree = "<group>"; };
+		AB000043 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		AB000044 /* ReportsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsViewModel.swift; sourceTree = "<group>"; };
+		AB000045 /* SDReportsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SDReportsViews.swift; sourceTree = "<group>"; };
+		AB000046 /* SalesOrderDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalesOrderDetailView.swift; sourceTree = "<group>"; };
+		AB000047 /* SalesOrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalesOrdersView.swift; sourceTree = "<group>"; };
+		AB000048 /* SalesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalesViewModel.swift; sourceTree = "<group>"; };
+		AB000049 /* StockCountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockCountView.swift; sourceTree = "<group>"; };
+		AB000050 /* WarehouseListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarehouseListView.swift; sourceTree = "<group>"; };
+		AB000051 /* WarehouseViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarehouseViewModel.swift; sourceTree = "<group>"; };
+		AB000052 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		AB000053 /* ERPCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ERPCard.swift; sourceTree = "<group>"; };
+		AB000054 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		AB000055 /* SearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchField.swift; sourceTree = "<group>"; };
+		AB000056 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
+		AB000057 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
+		AB000058 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		AB000059 /* OfflineSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineSyncManager.swift; sourceTree = "<group>"; };
+		AB000060 /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AD000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AE000001 = {
+			isa = PBXGroup;
+			children = (
+				AE000002 /* TasteByteERP */,
+				AE000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AE000002 /* TasteByteERP */ = {
+			isa = PBXGroup;
+			children = (
+				AB000001 /* TasteByteERPApp.swift */,
+				AB000002 /* ContentView.swift */,
+				AE000004 /* Core */,
+				AE000010 /* Features */,
+				AE000020 /* SharedViews */,
+			);
+			path = TasteByteERP;
+			sourceTree = "<group>";
+		};
+		AE000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AC000001 /* TasteByteERP.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AE000004 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				AE000005 /* Auth */,
+				AE000006 /* Extensions */,
+				AE000007 /* Models */,
+				AE000008 /* Network */,
+				AE000021 /* Storage */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		AE000005 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				AB000003 /* AuthManager.swift */,
+				AB000004 /* KeychainHelper.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		AE000006 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				AB000005 /* Color+Theme.swift */,
+				AB000006 /* Date+Formatting.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		AE000007 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AB000007 /* APIResponse.swift */,
+				AB000008 /* Attendance.swift */,
+				AB000009 /* Employee.swift */,
+				AB000010 /* InspectionLot.swift */,
+				AB000011 /* Material.swift */,
+				AB000012 /* ProductionOrder.swift */,
+				AB000013 /* PurchaseOrder.swift */,
+				AB000014 /* SalesOrder.swift */,
+				AB000015 /* User.swift */,
+				AB000016 /* Warehouse.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AE000008 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				AB000017 /* APIClient.swift */,
+				AB000018 /* APIEndpoints.swift */,
+				AB000019 /* APIError.swift */,
+				AB000058 /* NetworkMonitor.swift */,
+				AB000059 /* OfflineSyncManager.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		AE000010 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				AE000011 /* Auth */,
+				AE000012 /* Dashboard */,
+				AE000013 /* HR */,
+				AE000014 /* Materials */,
+				AE000015 /* Production */,
+				AE000016 /* Purchasing */,
+				AE000017 /* Quality */,
+				AE000018 /* Reports */,
+				AE000019 /* Sales */,
+				AE00001A /* Warehouse */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		AE000011 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				AB000020 /* LoginView.swift */,
+				AB000021 /* LoginViewModel.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		AE000012 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				AB000022 /* DashboardView.swift */,
+				AB000023 /* DashboardViewModel.swift */,
+				AB000024 /* KPICardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		AE000013 /* HR */ = {
+			isa = PBXGroup;
+			children = (
+				AB000025 /* AttendanceView.swift */,
+				AB000026 /* EmployeeListView.swift */,
+				AB000027 /* HRViewModel.swift */,
+			);
+			path = HR;
+			sourceTree = "<group>";
+		};
+		AE000014 /* Materials */ = {
+			isa = PBXGroup;
+			children = (
+				AB000028 /* MaterialDetailView.swift */,
+				AB000029 /* MaterialsListView.swift */,
+				AB000030 /* MaterialsViewModel.swift */,
+				AB000031 /* StockOverviewView.swift */,
+			);
+			path = Materials;
+			sourceTree = "<group>";
+		};
+		AE000015 /* Production */ = {
+			isa = PBXGroup;
+			children = (
+				AB000032 /* ProductionOrderDetailView.swift */,
+				AB000033 /* ProductionOrdersView.swift */,
+				AB000034 /* ProductionViewModel.swift */,
+			);
+			path = Production;
+			sourceTree = "<group>";
+		};
+		AE000016 /* Purchasing */ = {
+			isa = PBXGroup;
+			children = (
+				AB000035 /* PurchaseOrderDetailView.swift */,
+				AB000036 /* PurchaseOrdersView.swift */,
+				AB000037 /* PurchaseOrderViewModel.swift */,
+			);
+			path = Purchasing;
+			sourceTree = "<group>";
+		};
+		AE000017 /* Quality */ = {
+			isa = PBXGroup;
+			children = (
+				AB000038 /* InspectionFormView.swift */,
+				AB000039 /* InspectionListView.swift */,
+				AB000040 /* QualityViewModel.swift */,
+			);
+			path = Quality;
+			sourceTree = "<group>";
+		};
+		AE000018 /* Reports */ = {
+			isa = PBXGroup;
+			children = (
+				AB000041 /* FIReportsViews.swift */,
+				AB000042 /* MMReportsViews.swift */,
+				AB000043 /* ReportsView.swift */,
+				AB000044 /* ReportsViewModel.swift */,
+				AB000045 /* SDReportsViews.swift */,
+			);
+			path = Reports;
+			sourceTree = "<group>";
+		};
+		AE000019 /* Sales */ = {
+			isa = PBXGroup;
+			children = (
+				AB000046 /* SalesOrderDetailView.swift */,
+				AB000047 /* SalesOrdersView.swift */,
+				AB000048 /* SalesViewModel.swift */,
+			);
+			path = Sales;
+			sourceTree = "<group>";
+		};
+		AE00001A /* Warehouse */ = {
+			isa = PBXGroup;
+			children = (
+				AB000049 /* StockCountView.swift */,
+				AB000050 /* WarehouseListView.swift */,
+				AB000051 /* WarehouseViewModel.swift */,
+			);
+			path = Warehouse;
+			sourceTree = "<group>";
+		};
+		AE000020 /* SharedViews */ = {
+			isa = PBXGroup;
+			children = (
+				AB000052 /* EmptyStateView.swift */,
+				AB000053 /* ERPCard.swift */,
+				AB000054 /* LoadingView.swift */,
+				AB000060 /* OfflineBanner.swift */,
+				AB000055 /* SearchField.swift */,
+				AB000056 /* StatusBadge.swift */,
+			);
+			path = SharedViews;
+			sourceTree = "<group>";
+		};
+		AE000021 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				AB000057 /* CacheManager.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AF000001 /* TasteByteERP */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000001 /* Build configuration list for PBXNativeTarget "TasteByteERP" */;
+			buildPhases = (
+				AF000002 /* Sources */,
+				AD000001 /* Frameworks */,
+				AF000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TasteByteERP;
+			productName = TasteByteERP;
+			productReference = AC000001 /* TasteByteERP.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B0000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					AF000001 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+				};
+			};
+			buildConfigurationList = B1000002 /* Build configuration list for PBXProject "TasteByteERP" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AE000001;
+			productRefGroup = AE000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AF000001 /* TasteByteERP */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AF000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AF000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* TasteByteERPApp.swift in Sources */,
+				AA000002 /* ContentView.swift in Sources */,
+				AA000003 /* AuthManager.swift in Sources */,
+				AA000004 /* KeychainHelper.swift in Sources */,
+				AA000005 /* Color+Theme.swift in Sources */,
+				AA000006 /* Date+Formatting.swift in Sources */,
+				AA000007 /* APIResponse.swift in Sources */,
+				AA000008 /* Attendance.swift in Sources */,
+				AA000009 /* Employee.swift in Sources */,
+				AA000010 /* InspectionLot.swift in Sources */,
+				AA000011 /* Material.swift in Sources */,
+				AA000012 /* ProductionOrder.swift in Sources */,
+				AA000013 /* PurchaseOrder.swift in Sources */,
+				AA000014 /* SalesOrder.swift in Sources */,
+				AA000015 /* User.swift in Sources */,
+				AA000016 /* Warehouse.swift in Sources */,
+				AA000017 /* APIClient.swift in Sources */,
+				AA000018 /* APIEndpoints.swift in Sources */,
+				AA000019 /* APIError.swift in Sources */,
+				AA000020 /* LoginView.swift in Sources */,
+				AA000021 /* LoginViewModel.swift in Sources */,
+				AA000022 /* DashboardView.swift in Sources */,
+				AA000023 /* DashboardViewModel.swift in Sources */,
+				AA000024 /* KPICardView.swift in Sources */,
+				AA000025 /* AttendanceView.swift in Sources */,
+				AA000026 /* EmployeeListView.swift in Sources */,
+				AA000027 /* HRViewModel.swift in Sources */,
+				AA000028 /* MaterialDetailView.swift in Sources */,
+				AA000029 /* MaterialsListView.swift in Sources */,
+				AA000030 /* MaterialsViewModel.swift in Sources */,
+				AA000031 /* StockOverviewView.swift in Sources */,
+				AA000032 /* ProductionOrderDetailView.swift in Sources */,
+				AA000033 /* ProductionOrdersView.swift in Sources */,
+				AA000034 /* ProductionViewModel.swift in Sources */,
+				AA000035 /* PurchaseOrderDetailView.swift in Sources */,
+				AA000036 /* PurchaseOrdersView.swift in Sources */,
+				AA000037 /* PurchaseOrderViewModel.swift in Sources */,
+				AA000038 /* InspectionFormView.swift in Sources */,
+				AA000039 /* InspectionListView.swift in Sources */,
+				AA000040 /* QualityViewModel.swift in Sources */,
+				AA000041 /* FIReportsViews.swift in Sources */,
+				AA000042 /* MMReportsViews.swift in Sources */,
+				AA000043 /* ReportsView.swift in Sources */,
+				AA000044 /* ReportsViewModel.swift in Sources */,
+				AA000045 /* SDReportsViews.swift in Sources */,
+				AA000046 /* SalesOrderDetailView.swift in Sources */,
+				AA000047 /* SalesOrdersView.swift in Sources */,
+				AA000048 /* SalesViewModel.swift in Sources */,
+				AA000049 /* StockCountView.swift in Sources */,
+				AA000050 /* WarehouseListView.swift in Sources */,
+				AA000051 /* WarehouseViewModel.swift in Sources */,
+				AA000052 /* EmptyStateView.swift in Sources */,
+				AA000053 /* ERPCard.swift in Sources */,
+				AA000054 /* LoadingView.swift in Sources */,
+				AA000055 /* SearchField.swift in Sources */,
+				AA000056 /* StatusBadge.swift in Sources */,
+				AA000057 /* CacheManager.swift in Sources */,
+				AA000058 /* NetworkMonitor.swift in Sources */,
+				AA000059 /* OfflineSyncManager.swift in Sources */,
+				AA000060 /* OfflineBanner.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B2000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B2000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B2000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tastebyte.erp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B2000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tastebyte.erp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B1000001 /* Build configuration list for PBXNativeTarget "TasteByteERP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2000003 /* Debug */,
+				B2000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1000002 /* Build configuration list for PBXProject "TasteByteERP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2000001 /* Debug */,
+				B2000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = B0000001 /* Project object */;
+}

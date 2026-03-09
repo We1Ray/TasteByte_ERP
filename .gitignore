@@ -1,0 +1,73 @@
+# Rust
+/backend/target/
+**/*.rs.bk
+
+# Node / Next.js
+/web/node_modules/
+/web/.next/
+/web/out/
+
+# Flutter / Dart
+/mobile/.dart_tool/
+/mobile/.packages
+/mobile/build/
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/android/.gradle/
+/mobile/ios/Pods/
+/mobile/ios/.symlinks/
+/mobile/pubspec.lock
+
+# Native Android
+/android/.gradle/
+/android/app/build/
+/android/build/
+/android/local.properties
+
+# Native iOS
+/ios/build/
+/ios/DerivedData/
+/ios/*.xcworkspace/xcuserdata/
+/ios/*.xcodeproj/xcuserdata/
+
+# Uploads
+/backend/uploads/
+
+# Backups
+/backups/
+
+# Docker
+docker-compose.override.yml
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Security
+*.pem
+*.key
+*.cert
+**/secrets/
+**/credentials/
+
+# Test artifacts
+coverage/
+.coverage
+.test-results/
+*.lcov
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# OS
+*.DS_Store
+Thumbs.db
+
+# Logs
+*.log
