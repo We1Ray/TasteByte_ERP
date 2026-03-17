@@ -40,6 +40,11 @@
   <img src="docs/videos/purchase-order-flow.gif" alt="Purchase Order Flow" width="720" />
 </p>
 
+### Developer & Low-Code Platform Workflow
+<p align="center">
+  <img src="docs/videos/developer-workflow.gif" alt="Developer Workflow" width="720" />
+</p>
+
 ---
 
 ## Architecture Overview
@@ -285,32 +290,65 @@
   <img src="docs/screenshots/23-developer-hub.png" alt="Developer Hub" width="720" />
 </p>
 
+> Developer dashboard showing 6 operations across 2 projects, 3 releases, and recent activity
+
 <p align="center">
   <img src="docs/screenshots/24-developer-operations.png" alt="Developer Operations" width="720" />
 </p>
 
+> Operations management with cross-project forms: Material Request, Customer Feedback, Equipment Maintenance, Food Safety Checklist, Supplier Evaluation, Employee Training
+
 <p align="center">
-  <img src="docs/screenshots/25-lowcode-platform.png" alt="Low-Code Platform" width="720" />
+  <img src="docs/screenshots/28-lowcode-platform.png" alt="Low-Code Platform" width="720" />
 </p>
 
-- **Form Builder** — WYSIWYG field editor with drag & drop
+> Published operations directory — all 6 forms available as cards for end users
+
+<p align="center">
+  <img src="docs/screenshots/29-lowcode-form-data.png" alt="Module-linked Operation" width="720" />
+</p>
+
+> Cross-module integration: Material Request Form linked to MM module sidebar, with dynamic navigation
+
+<p align="center">
+  <img src="docs/screenshots/26-developer-feedback.png" alt="Developer Feedback" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/31-admin-projects.png" alt="Admin Projects" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/32-admin-releases.png" alt="Admin Releases" width="720" />
+</p>
+
+**Cross-module operations (6 forms linked to ERP modules):**
+| Operation | Module | Description |
+|-----------|--------|-------------|
+| Material Request Form | MM | Request new materials for inventory |
+| Customer Feedback Form | SD | Collect customer satisfaction feedback |
+| Equipment Maintenance Log | PP | Log production equipment maintenance |
+| Food Safety Checklist | QM | Daily food safety inspection checklist |
+| Supplier Evaluation Form | MM | Evaluate supplier performance |
+| Employee Training Record | HR | Track employee training & certifications |
+
+**Platform features:**
+- **Form Builder** — WYSIWYG field editor with sections, dropdowns, checkboxes
 - **List Builder** — custom list views with columns, sorting, filtering
 - **Dashboard Builder** — KPI visualization designer
-- **Data Sources** — query builder with SQL validation & table browser
-- **Workflow Engine** — configurable status transitions
-- **Document Flow** — automatic document linking across operations
+- **Cross-module Linking** — operations appear in ERP module sidebars (MM, SD, PP, QM, HR)
 - **Release Management** — development → approval → production lifecycle
 - **Version Control** — journal history with rollback capability
-- **AI Chat Assistant** — integrated LLM (OpenAI/Claude) for developer help
-- **Bulk Import/Export** — CSV upload/download support
+- **Feedback System** — bug reports, feature requests with comment threads
 - **Record & Field-level Security** — granular row policies & permission control
+- **AI Chat Assistant** — integrated LLM (OpenAI/Claude) for developer help
 
 ---
 
 ### Notification Center
 
 <p align="center">
-  <img src="docs/screenshots/26-notifications.png" alt="Notifications" width="720" />
+  <img src="docs/screenshots/33-notifications.png" alt="Notifications" width="720" />
 </p>
 
 - In-app notification system
