@@ -31,7 +31,11 @@ export default function SalesOrdersPage() {
         <span className="font-medium text-blue-600">{row.original.order_number}</span>
       ),
     },
-    { accessorKey: "customer_name", header: t("customer") },
+    {
+      accessorKey: "customer_name",
+      header: t("customer"),
+      cell: ({ row }) => row.original.customer_name ?? "-",
+    },
     {
       accessorKey: "order_date",
       header: t("orderDate"),
@@ -40,7 +44,7 @@ export default function SalesOrdersPage() {
     {
       accessorKey: "delivery_date",
       header: t("deliveryDate"),
-      cell: ({ row }) => formatDate(row.original.delivery_date),
+      cell: ({ row }) => formatDate(row.original.delivery_date ?? row.original.requested_delivery_date),
     },
     {
       accessorKey: "total_amount",

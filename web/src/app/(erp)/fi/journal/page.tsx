@@ -43,14 +43,14 @@ export default function JournalPage() {
       accessorKey: "total_debit",
       header: t("debit"),
       cell: ({ row }) => (
-        <span className="font-mono">{formatCurrency(row.original.total_debit)}</span>
+        <span className="font-mono">{formatCurrency(row.original.total_debit ?? 0)}</span>
       ),
     },
     {
       accessorKey: "total_credit",
       header: t("credit"),
       cell: ({ row }) => (
-        <span className="font-mono">{formatCurrency(row.original.total_credit)}</span>
+        <span className="font-mono">{formatCurrency(row.original.total_credit ?? 0)}</span>
       ),
     },
     {

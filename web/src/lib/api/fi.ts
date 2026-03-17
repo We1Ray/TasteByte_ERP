@@ -6,9 +6,10 @@ export interface Account {
   name: string;
   account_type: string;
   parent_id: string | null;
-  currency: string;
+  account_group_id: string | null;
+  currency?: string;
   is_active: boolean;
-  balance: number;
+  balance?: number | null;
   created_at: string;
 }
 
@@ -17,12 +18,12 @@ export interface JournalEntry {
   document_number: string;
   posting_date: string;
   document_date: string;
-  description: string;
-  reference: string;
+  description: string | null;
+  reference: string | null;
   status: string;
-  total_debit: number;
-  total_credit: number;
-  line_items: JournalLineItem[];
+  total_debit?: number | null;
+  total_credit?: number | null;
+  line_items?: JournalLineItem[];
   created_at: string;
 }
 

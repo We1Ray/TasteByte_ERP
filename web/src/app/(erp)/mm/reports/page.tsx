@@ -106,7 +106,7 @@ export default function MmReportsPage() {
             <CardTitle>{t("stockValuation")}</CardTitle>
             {stockValuation && (
               <span className="text-lg font-bold text-gray-900">
-                {tCommon("total")}: {formatCurrency(stockValuation.total_value)}
+                {tCommon("total")}: {formatCurrency(stockValuation.total_value ?? 0)}
               </span>
             )}
           </CardHeader>

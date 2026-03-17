@@ -29,7 +29,11 @@ export default function InvoicesPage() {
         <span className="font-medium text-blue-600">{row.original.invoice_number}</span>
       ),
     },
-    { accessorKey: "customer_name", header: t("customer") },
+    {
+      accessorKey: "customer_name",
+      header: t("customer"),
+      cell: ({ row }) => row.original.customer_name ?? "-",
+    },
     {
       accessorKey: "invoice_date",
       header: t("invoiceDate"),
@@ -44,14 +48,14 @@ export default function InvoicesPage() {
       accessorKey: "total_amount",
       header: tc("total"),
       cell: ({ row }) => (
-        <span className="font-mono">{formatCurrency(row.original.total_amount, row.original.currency)}</span>
+        <span className="font-mono">{formatCurrency(row.original.total_amount, row.original.currency ?? "USD")}</span>
       ),
     },
     {
       accessorKey: "paid_amount",
       header: t("paid"),
       cell: ({ row }) => (
-        <span className="font-mono">{formatCurrency(row.original.paid_amount, row.original.currency)}</span>
+        <span className="font-mono">{formatCurrency(row.original.paid_amount ?? 0, row.original.currency ?? "USD")}</span>
       ),
     },
     {

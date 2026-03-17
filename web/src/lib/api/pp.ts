@@ -4,14 +4,16 @@ export interface BillOfMaterial {
   id: string;
   bom_number: string;
   material_id: string;
-  material_number: string;
-  material_name: string;
-  quantity: number;
-  unit: string;
+  material_number?: string;
+  material_name?: string;
+  name?: string;
+  quantity?: number | null;
+  unit?: string;
+  version?: number;
   status: string;
-  valid_from: string;
+  valid_from: string | null;
   valid_to: string | null;
-  items: BomItem[];
+  items?: BomItem[];
   created_at: string;
 }
 
@@ -47,17 +49,21 @@ export interface ProductionOrder {
   id: string;
   order_number: string;
   material_id: string;
-  material_number: string;
-  material_name: string;
+  material_number?: string;
+  material_name?: string;
   bom_id: string;
-  quantity: number;
-  unit: string;
-  planned_start: string;
-  planned_end: string;
+  routing_id?: string | null;
+  quantity?: number | null;
+  planned_quantity?: number | null;
+  actual_quantity?: number | null;
+  unit?: string;
+  uom_id?: string | null;
+  planned_start: string | null;
+  planned_end: string | null;
   actual_start: string | null;
   actual_end: string | null;
   status: string;
-  completed_quantity: number;
+  completed_quantity?: number | null;
   created_at: string;
 }
 

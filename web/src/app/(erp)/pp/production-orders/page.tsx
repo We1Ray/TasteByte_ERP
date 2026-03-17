@@ -35,26 +35,31 @@ export default function ProductionOrdersPage() {
       header: t("material"),
       cell: ({ row }) => (
         <div>
-          <p className="font-medium text-gray-900">{row.original.material_name}</p>
-          <p className="text-xs text-gray-500">{row.original.material_number}</p>
+          <p className="font-medium text-gray-900">{row.original.material_name ?? "-"}</p>
+          <p className="text-xs text-gray-500">{row.original.material_number ?? ""}</p>
         </div>
       ),
     },
     {
       accessorKey: "quantity",
       header: tc("quantity"),
-      cell: ({ row }) => (
-        <span>{formatNumber(row.original.quantity)} {row.original.unit}</span>
-      ),
+      cell: ({ row }) => {
+        const qty = row.original.quantity ?? row.original.planned_quantity ?? 0;
+        return <span>{formatNumber(qty)} {row.original.unit ?? ""}</span>;
+      },
     },
     {
       accessorKey: "completed_quantity",
       header: t("completed"),
-      cell: ({ row }) => (
-        <Badge color={row.original.completed_quantity >= row.original.quantity ? "green" : "amber"}>
-          {formatNumber(row.original.completed_quantity)} / {formatNumber(row.original.quantity)}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const completed = row.original.completed_quantity ?? row.original.actual_quantity ?? 0;
+        const total = row.original.quantity ?? row.original.planned_quantity ?? 0;
+        return (
+          <Badge color={completed >= total ? "green" : "amber"}>
+            {formatNumber(completed)} / {formatNumber(total)}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "planned_start",

@@ -42,13 +42,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const outstanding = invoice.total_amount - invoice.paid_amount;
+  const outstanding = invoice.total_amount - (invoice.paid_amount ?? 0);
 
   return (
     <div>
       <PageHeader
         title={`${t("invoices")} ${invoice.invoice_number}`}
-        description={`${t("customer")}: ${invoice.customer_name}`}
+        description={`${t("customer")}: ${invoice.customer_name ?? "-"}`}
         actions={
           <Button variant="secondary" onClick={() => router.push("/sd/invoices")}>
             <ArrowLeft className="h-4 w-4" />

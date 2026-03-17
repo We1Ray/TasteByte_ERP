@@ -36,7 +36,11 @@ export default function PurchaseOrdersPage() {
         <span className="font-medium text-blue-600">{row.original.po_number}</span>
       ),
     },
-    { accessorKey: "vendor_name", header: "Vendor" },
+    {
+      accessorKey: "vendor_name",
+      header: "Vendor",
+      cell: ({ row }) => row.original.vendor_name ?? "-",
+    },
     {
       accessorKey: "order_date",
       header: t("orderDate"),

@@ -80,7 +80,7 @@ export default function StockPage() {
         />
         <KpiCard
           title={t("belowReorderPoint")}
-          value={formatNumber(stockValuation?.items.filter(i => i.quantity <= 0).length ?? 0)}
+          value={formatNumber((stockValuation?.items ?? []).filter(i => i.quantity <= 0).length)}
           change={t("requiresAttention")}
           changeType="negative"
           icon={AlertTriangle}

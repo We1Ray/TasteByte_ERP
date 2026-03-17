@@ -41,8 +41,8 @@ export default function BomsPage() {
       header: t("material"),
       cell: ({ row }) => (
         <div>
-          <p className="font-medium text-gray-900">{row.original.material_name}</p>
-          <p className="text-xs text-gray-500">{row.original.material_number}</p>
+          <p className="font-medium text-gray-900">{row.original.material_name ?? row.original.name ?? "-"}</p>
+          <p className="text-xs text-gray-500">{row.original.material_number ?? ""}</p>
         </div>
       ),
     },
@@ -51,14 +51,14 @@ export default function BomsPage() {
       header: t("baseQty"),
       cell: ({ row }) => (
         <span>
-          {formatNumber(row.original.quantity)} {row.original.unit}
+          {formatNumber(row.original.quantity ?? 0)} {row.original.unit ?? ""}
         </span>
       ),
     },
     {
       accessorKey: "items",
       header: t("components"),
-      cell: ({ row }) => <span>{row.original.items?.length || 0} {t("items")}</span>,
+      cell: ({ row }) => <span>{(row.original.items ?? []).length} {t("items")}</span>,
     },
     {
       accessorKey: "valid_from",

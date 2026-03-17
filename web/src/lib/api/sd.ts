@@ -19,13 +19,15 @@ export interface SalesOrder {
   id: string;
   order_number: string;
   customer_id: string;
-  customer_name: string;
+  customer_name?: string;
   order_date: string;
-  delivery_date: string;
+  delivery_date?: string | null;
+  requested_delivery_date?: string | null;
   status: string;
   total_amount: number;
   currency: string;
-  items: SalesOrderItem[];
+  notes?: string | null;
+  items?: SalesOrderItem[];
   created_at: string;
 }
 
@@ -74,22 +76,23 @@ export interface Invoice {
   id: string;
   invoice_number: string;
   sales_order_id: string;
+  delivery_id?: string | null;
   customer_id: string;
-  customer_name: string;
+  customer_name?: string;
   invoice_date: string;
   due_date: string;
   status: string;
   total_amount: number;
-  paid_amount: number;
-  currency: string;
+  paid_amount?: number | null;
+  currency?: string;
   created_at: string;
 }
 
 export interface SalesSummary {
-  total_revenue: number;
-  total_orders: number;
-  average_order_value: number;
-  items: { date: string; revenue: number; order_count: number }[];
+  total_revenue?: number | null;
+  total_orders?: number | null;
+  average_order_value?: number | null;
+  items?: { date: string; revenue: number; order_count: number }[];
 }
 
 export interface OrderFulfillment {

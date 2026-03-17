@@ -65,9 +65,9 @@ export default function SdReportsPage() {
     (activeTab === "top-customers" && tcLoading);
 
   const exportData = useMemo(() => {
-    if (activeTab === "sales-summary") return salesSummary?.items ?? [];
-    if (activeTab === "order-fulfillment") return fulfillment?.orders ?? [];
-    return topCustomers ?? [];
+    if (activeTab === "sales-summary") return (salesSummary?.items ?? []) as unknown as Record<string, unknown>[];
+    if (activeTab === "order-fulfillment") return (fulfillment?.orders ?? []) as unknown as Record<string, unknown>[];
+    return (topCustomers ?? []) as unknown as Record<string, unknown>[];
   }, [activeTab, salesSummary, fulfillment, topCustomers]);
 
   return (
@@ -108,9 +108,9 @@ export default function SdReportsPage() {
             <KPIGrid
               columns={3}
               items={[
-                { label: "Total Revenue", value: salesSummary.total_revenue, format: "currency" },
-                { label: "Total Orders", value: salesSummary.total_orders, format: "number" },
-                { label: "Average Order Value", value: salesSummary.average_order_value, format: "currency" },
+                { label: "Total Revenue", value: salesSummary.total_revenue ?? 0, format: "currency" },
+                { label: "Total Orders", value: salesSummary.total_orders ?? 0, format: "number" },
+                { label: "Average Order Value", value: salesSummary.average_order_value ?? 0, format: "currency" },
               ]}
             />
           )}
@@ -137,10 +137,10 @@ export default function SdReportsPage() {
           {fulfillment && (
             <KPIGrid
               items={[
-                { label: "Total Orders", value: fulfillment.total_orders, format: "number" },
-                { label: "Fully Delivered", value: fulfillment.fully_delivered, format: "number", color: "green" },
-                { label: "Partially Delivered", value: fulfillment.partially_delivered, format: "number", color: "amber" },
-                { label: "Fulfillment Rate", value: fulfillment.fulfillment_rate, format: "percentage", color: "blue" },
+                { label: "Total Orders", value: fulfillment.total_orders ?? 0, format: "number" },
+                { label: "Fully Delivered", value: fulfillment.fully_delivered ?? 0, format: "number", color: "green" },
+                { label: "Partially Delivered", value: fulfillment.partially_delivered ?? 0, format: "number", color: "amber" },
+                { label: "Fulfillment Rate", value: fulfillment.fulfillment_rate ?? 0, format: "percentage", color: "blue" },
               ]}
             />
           )}

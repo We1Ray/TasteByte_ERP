@@ -43,7 +43,7 @@ export default function AccountsPage() {
       accessorKey: "balance",
       header: t("balance"),
       cell: ({ row }) => (
-        <span className="font-mono">{formatCurrency(row.original.balance, row.original.currency)}</span>
+        <span className="font-mono">{formatCurrency(row.original.balance ?? 0, row.original.currency ?? "USD")}</span>
       ),
     },
     {

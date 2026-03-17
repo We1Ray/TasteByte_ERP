@@ -114,9 +114,9 @@ export default function ProductionOrderDetailPage({ params }: { params: Promise<
             layout="grid"
             columns={2}
             items={[
-              { label: t("material"), value: <><span className="font-medium">{order.material_name}</span><br /><span className="text-xs text-gray-500">{order.material_number}</span></> },
-              { label: tc("quantity"), value: `${formatNumber(order.quantity)} ${order.unit}` },
-              { label: t("completed"), value: <Badge color={order.completed_quantity >= order.quantity ? "green" : "amber"}>{formatNumber(order.completed_quantity)} / {formatNumber(order.quantity)}</Badge> },
+              { label: t("material"), value: <><span className="font-medium">{order.material_name ?? "-"}</span><br /><span className="text-xs text-gray-500">{order.material_number ?? ""}</span></> },
+              { label: tc("quantity"), value: `${formatNumber(order.quantity ?? order.planned_quantity ?? 0)} ${order.unit ?? ""}` },
+              { label: t("completed"), value: <Badge color={(order.completed_quantity ?? order.actual_quantity ?? 0) >= (order.quantity ?? order.planned_quantity ?? 0) ? "green" : "amber"}>{formatNumber(order.completed_quantity ?? order.actual_quantity ?? 0)} / {formatNumber(order.quantity ?? order.planned_quantity ?? 0)}</Badge> },
               { label: tc("status"), value: <StatusBadge status={order.status} /> },
               { label: t("plannedStart"), value: formatDate(order.planned_start) },
               { label: t("plannedEnd"), value: formatDate(order.planned_end) },

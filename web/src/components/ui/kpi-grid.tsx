@@ -6,7 +6,7 @@ import { Card } from "./card";
 
 interface KPIItem {
   label: string;
-  value: string | number;
+  value: string | number | null | undefined;
   format?: "currency" | "number" | "percentage" | "plain";
   color?: "blue" | "green" | "amber" | "red" | "purple";
   prefix?: string;
@@ -35,7 +35,10 @@ const gridCols = {
 
 function formatKPIValue(item: KPIItem): string {
   const { value, format, prefix = "", suffix = "" } = item;
-  const num = typeof value === "number" ? value : parseFloat(value);
+  if (value === undefined || value === null) {
+    return `${prefix}0${suffix}`;
+  }
+  const num = typeof value === "number" ? value : parseFloat(String(value));
 
   if (format === "plain" || isNaN(num)) {
     return `${prefix}${value}${suffix}`;

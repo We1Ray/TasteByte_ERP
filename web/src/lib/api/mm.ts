@@ -36,13 +36,14 @@ export interface PurchaseOrder {
   id: string;
   po_number: string;
   vendor_id: string;
-  vendor_name: string;
+  vendor_name?: string;
   order_date: string;
-  delivery_date: string;
+  delivery_date: string | null;
   status: string;
   total_amount: number;
   currency: string;
-  items: PurchaseOrderItem[];
+  notes?: string | null;
+  items?: PurchaseOrderItem[];
   created_at: string;
 }
 

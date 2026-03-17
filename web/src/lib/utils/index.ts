@@ -4,17 +4,21 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
-export function formatCurrency(amount: number, currency = "USD"): string {
+export function formatCurrency(amount: number | null | undefined, currency = "USD"): string {
+  const safeAmount = amount ?? 0;
+  if (isNaN(safeAmount)) return "$0.00";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(safeAmount);
 }
 
-export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "-";
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
@@ -23,15 +27,19 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
   }).format(d);
 }
 
-export function formatNumber(num: number, decimals = 0): string {
+export function formatNumber(num: number | null | undefined, decimals = 0): string {
+  const safeNum = num ?? 0;
+  if (isNaN(safeNum)) return "0";
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(num);
+  }).format(safeNum);
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "-";
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
