@@ -50,6 +50,7 @@ pub async fn setup_server() -> TestServer {
         pool,
         settings,
         metrics_handle: metrics_handle(),
+        llm_client: None,
     };
     let router = build_router(state);
     // Use into_make_service_with_connect_info so rate limiter can extract peer IP

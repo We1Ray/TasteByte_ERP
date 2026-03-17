@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Mock next/navigation
 let mockPathname = "/dashboard";
@@ -104,6 +105,12 @@ vi.mock("@/lib/utils", () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
 }));
 
+vi.mock("@/lib/api/lowcode", () => ({
+  moduleOpsApi: {
+    listByModule: vi.fn(() => Promise.resolve([])),
+  },
+}));
+
 import { ErpSidebar } from "@/components/layout/erp-sidebar";
 import { usePlatformRole } from "@/lib/hooks/use-platform-role";
 
@@ -111,7 +118,16 @@ describe("ErpSidebar", () => {
   let container: HTMLElement;
 
   function renderSidebar() {
-    const result = render(React.createElement(ErpSidebar));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const result = render(
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        React.createElement(ErpSidebar)
+      )
+    );
     container = result.container;
     return result;
   }
@@ -165,7 +181,8 @@ describe("ErpSidebar", () => {
     const view = within(container);
 
     // Translation returns key as-is; sidebar renders shortLabel ? `${shortLabel} - ${label}` : label
-    expect(view.getByText("dashboard")).toBeInTheDocument();
+    // "dashboard" appears twice (main nav + admin child), so use getAllByText
+    expect(view.getAllByText("dashboard").length).toBeGreaterThanOrEqual(1);
     expect(view.getByText(/FI - fi/)).toBeInTheDocument();
     expect(view.getByText(/CO - co/)).toBeInTheDocument();
     expect(view.getByText(/MM - mm/)).toBeInTheDocument();
@@ -316,16 +333,22 @@ describe("ErpSidebar", () => {
 
       expect(view.getByText("chartOfAccounts")).toBeInTheDocument();
       expect(view.getByText("journalEntries")).toBeInTheDocument();
-      expect(view.getByText("reports")).toBeInTheDocument();
+      // "reports" appears in multiple modules (FI, MM, SD), verify FI reports link exists
+      const fiReportsLink = container.querySelector('a[href="/fi/reports"]');
+      expect(fiReportsLink).toBeInTheDocument();
     });
 
-    it("does not show child links for inactive modules", () => {
+    it("hides child links for inactive modules via collapsed styling", () => {
       mockPathname = "/dashboard";
       renderSidebar();
       const view = within(container);
 
-      expect(view.queryByText("chartOfAccounts")).not.toBeInTheDocument();
-      expect(view.queryByText("journalEntries")).not.toBeInTheDocument();
+      // Children are in the DOM but hidden via max-h-0 and opacity-0
+      const chartLink = view.queryByText("chartOfAccounts");
+      expect(chartLink).toBeInTheDocument();
+      const childContainer = chartLink!.closest("ul")!.parentElement!;
+      expect(childContainer.className).toContain("max-h-0");
+      expect(childContainer.className).toContain("opacity-0");
     });
   });
 });
