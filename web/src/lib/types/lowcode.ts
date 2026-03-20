@@ -132,6 +132,12 @@ export interface FieldDefinition {
   data_source?: FieldDataSource;
   db_column?: string;
   visibility_rules?: VisibilityRule[];
+  visibility_rule?: {
+    dependent_field?: string;
+    operator?: string;
+    value?: string;
+    action?: string;
+  } | null;
   lookup_config?: LookupConfig;
   composite_steps?: CompositeStep[];
   sort_order: number;

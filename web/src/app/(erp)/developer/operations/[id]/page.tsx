@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Save, Eye, EyeOff, ArrowLeft, Settings, Rocket, Layout } from "lucide-react";
+import { Save, Eye, EyeOff, ArrowLeft, Settings, Rocket, Layout, Undo2, Redo2, GitBranch } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -14,6 +14,7 @@ import { PreviewPanel } from "@/components/lowcode/form-builder/PreviewPanel";
 import { OperationSettingsModal } from "@/components/lowcode/form-builder/OperationSettingsModal";
 import { ReleaseSubmitModal } from "@/components/lowcode/form-builder/ReleaseSubmitModal";
 import { WorkflowStatusIndicator } from "@/components/lowcode/form-builder/WorkflowStatusIndicator";
+import { LogicDesigner } from "@/components/lowcode/form-builder/logic-designer";
 import { WizardConfigPanel } from "@/components/lowcode/form-builder/WizardConfigPanel";
 import { TabGroupEditor } from "@/components/lowcode/form-builder/TabGroupEditor";
 import { ListBuilder } from "@/components/lowcode/list-builder/ListBuilder";
@@ -66,11 +67,21 @@ function FormBuilderContent({ id, operation }: { id: string; operation?: { name?
     layoutConfig, setLayoutConfig,
     updateFormSettings, updateLayoutConfig,
     isDirty, markClean,
+    undo, redo, canUndo, canRedo,
   } = useBuilderStore();
+
+  // Set operation ID for session persistence
+  useEffect(() => {
+    if (id && id !== "new") {
+      useBuilderStore.getState().setOperationId(id);
+    }
+  }, [id]);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [viewMode, setViewMode] = useState<"form" | "logic">("form");
 
   // AI assistant
   const { data: aiStatus } = useApiQuery(
@@ -143,7 +154,7 @@ function FormBuilderContent({ id, operation }: { id: string; operation?: { name?
     }
   );
 
-  // Keyboard shortcut: Ctrl+S / Cmd+S to save
+  // Keyboard shortcuts: Cmd+S save, Cmd+Z undo, Cmd+Shift+Z redo
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -152,10 +163,18 @@ function FormBuilderContent({ id, operation }: { id: string; operation?: { name?
           saveMutation.mutateAsync(undefined);
         }
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isDirty, saveMutation]);
+  }, [isDirty, saveMutation, undo, redo]);
 
   if (id !== "new" && formLoading) {
     return <PageLoading />;
@@ -187,6 +206,25 @@ function FormBuilderContent({ id, operation }: { id: string; operation?: { name?
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (Cmd+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (Cmd+Shift+Z)"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          <div className="mx-1 h-5 w-px bg-gray-200" />
           {id !== "new" && (
             <>
               <Button
@@ -207,6 +245,14 @@ function FormBuilderContent({ id, operation }: { id: string; operation?: { name?
               </Button>
             </>
           )}
+          <Button
+            variant={viewMode === "logic" ? "primary" : "secondary"}
+            onClick={() => setViewMode(viewMode === "logic" ? "form" : "logic")}
+            title={viewMode === "logic" ? "Switch to Form Editor" : "Switch to Logic Designer"}
+          >
+            <GitBranch className="h-4 w-4" />
+            {viewMode === "logic" ? "Form" : "Logic"}
+          </Button>
           <Button
             variant={showPreview ? "primary" : "secondary"}
             onClick={() => setShowPreview(!showPreview)}
@@ -237,25 +283,38 @@ function FormBuilderContent({ id, operation }: { id: string; operation?: { name?
         </div>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
+      {viewMode === "form" ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex flex-1 overflow-hidden">
+            <FieldPalette />
+            <BuilderCanvas />
+            {showPreview ? (
+              <div className="w-[420px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white">
+                <PreviewPanel operationCode={operation?.code || ""} />
+              </div>
+            ) : (
+              <PropertyPanel />
+            )}
+          </div>
+          <BuilderDragOverlay activeDragItem={activeDragItem} />
+        </DndContext>
+      ) : (
         <div className="flex flex-1 overflow-hidden">
-          <FieldPalette />
-          <BuilderCanvas />
-          {showPreview ? (
-            <div className="w-[420px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white">
-              <PreviewPanel operationCode={operation?.code || ""} />
-            </div>
-          ) : (
-            <PropertyPanel />
-          )}
+          <div className="flex-1">
+            <LogicDesigner
+              onFieldSelect={(fieldId) => {
+                useBuilderStore.getState().selectField(fieldId);
+              }}
+            />
+          </div>
+          <PropertyPanel />
         </div>
-        <BuilderDragOverlay activeDragItem={activeDragItem} />
-      </DndContext>
+      )}
 
       {aiStatus?.enabled && (
         <>

@@ -1,6 +1,7 @@
 pub mod ai_service;
 pub mod ai_tools;
 pub mod diff_engine;
+pub mod field_validator;
 pub mod form_builder;
 pub mod notifications;
 pub mod permission_resolver;

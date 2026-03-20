@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageLoading } from "@/components/ui/loading";
 import { ButtonDesigner, type ButtonItem } from "@/components/lowcode/ButtonDesigner";
+import { RecordPolicyPanel } from "@/components/lowcode/form-builder/RecordPolicyPanel";
 import { useApiQuery, useInvalidateQueries } from "@/lib/hooks/use-api-query";
 import { useToastMutation } from "@/lib/hooks/use-toast-mutation";
 import { operationsApi, datasourceApi, buttonsApi } from "@/lib/api/lowcode";
@@ -261,6 +262,11 @@ export default function OperationSettingsPage() {
           />
         </div>
       </Card>
+
+      {/* Record Policies */}
+      <div className="mb-6">
+        <RecordPolicyPanel operationId={operationId} />
+      </div>
 
       {/* Save Button */}
       <div className="mb-8 flex justify-end">

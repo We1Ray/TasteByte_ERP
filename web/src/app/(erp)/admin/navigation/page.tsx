@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   DndContext,
@@ -18,11 +18,12 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Trash2, Edit2, Check, X } from "lucide-react";
+import { GripVertical, Plus, Trash2, Edit2, Check, X, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageLoading } from "@/components/ui/loading";
@@ -30,8 +31,64 @@ import { useApiQuery, useApiMutation, useInvalidateQueries } from "@/lib/hooks/u
 import { navigationApi } from "@/lib/api/lowcode";
 import type { NavigationItem } from "@/lib/types/lowcode";
 
+// ── Tree utilities ────────────────────────────────────────────────────
+
+interface TreeNavItem extends NavigationItem {
+  children: TreeNavItem[];
+  depth: number;
+}
+
+function buildTree(items: NavigationItem[]): TreeNavItem[] {
+  const map = new Map<string, TreeNavItem>();
+  const roots: TreeNavItem[] = [];
+
+  // Initialize all items
+  for (const item of items) {
+    map.set(item.id, { ...item, children: [], depth: 0 });
+  }
+
+  // Build parent-child relationships
+  for (const item of items) {
+    const treeItem = map.get(item.id)!;
+    if (item.parent_id && map.has(item.parent_id)) {
+      const parent = map.get(item.parent_id)!;
+      treeItem.depth = parent.depth + 1;
+      parent.children.push(treeItem);
+    } else {
+      roots.push(treeItem);
+    }
+  }
+
+  // Sort children by sort_order
+  function sortChildren(nodes: TreeNavItem[]) {
+    nodes.sort((a, b) => a.sort_order - b.sort_order);
+    for (const node of nodes) {
+      sortChildren(node.children);
+    }
+  }
+  sortChildren(roots);
+
+  return roots;
+}
+
+function flattenTree(roots: TreeNavItem[]): TreeNavItem[] {
+  const result: TreeNavItem[] = [];
+  function walk(nodes: TreeNavItem[], depth: number) {
+    for (const node of nodes) {
+      node.depth = depth;
+      result.push(node);
+      walk(node.children, depth + 1);
+    }
+  }
+  walk(roots, 0);
+  return result;
+}
+
+// ── Sortable Item Component ───────────────────────────────────────────
+
 function SortableNavItem({
   item,
+  depth,
   editingId,
   editLabel,
   setEditLabel,
@@ -41,6 +98,7 @@ function SortableNavItem({
   onDelete,
 }: {
   item: NavigationItem;
+  depth: number;
   editingId: string | null;
   editLabel: string;
   setEditLabel: (v: string) => void;
@@ -60,8 +118,8 @@ function SortableNavItem({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-3 rounded-md border border-gray-100 bg-white px-3 py-2.5 hover:bg-gray-50"
+      style={{ ...style, paddingLeft: `${depth * 24 + 12}px` }}
+      className="flex items-center gap-3 rounded-md border border-gray-100 bg-white py-2.5 pr-3 hover:bg-gray-50"
     >
       <button
         {...attributes}
@@ -70,6 +128,10 @@ function SortableNavItem({
       >
         <GripVertical className="h-4 w-4" />
       </button>
+
+      {depth > 0 && (
+        <ChevronRight className="h-3 w-3 text-gray-300" />
+      )}
 
       {editingId === item.id ? (
         <div className="flex flex-1 items-center gap-2">
@@ -112,6 +174,8 @@ function SortableNavItem({
   );
 }
 
+// ── Page Component ────────────────────────────────────────────────────
+
 export default function AdminNavigationPage() {
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
@@ -120,7 +184,13 @@ export default function AdminNavigationPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ label: "", href: "", icon: "", operation_code: "" });
+  const [formData, setFormData] = useState({
+    label: "",
+    href: "",
+    icon: "",
+    operation_code: "",
+    parent_id: "",
+  });
 
   const { data: navItems, isLoading } = useApiQuery(
     ["lowcode", "navigation"],
@@ -133,7 +203,7 @@ export default function AdminNavigationPage() {
       onSuccess: () => {
         invalidate(["lowcode", "navigation"]);
         setShowCreate(false);
-        setFormData({ label: "", href: "", icon: "", operation_code: "" });
+        setFormData({ label: "", href: "", icon: "", operation_code: "", parent_id: "" });
       },
     }
   );
@@ -158,9 +228,22 @@ export default function AdminNavigationPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  if (isLoading) return <PageLoading />;
-
   const items = navItems || [];
+
+  // Build tree and flatten for rendering
+  const flatItems = useMemo(() => {
+    return flattenTree(buildTree(items));
+  }, [items]);
+
+  // Parent options for the create form (exclude self and children when editing)
+  const parentOptions = useMemo(() => {
+    return [
+      { value: "", label: t("noParent") },
+      ...items.map((item) => ({ value: item.id, label: item.label })),
+    ];
+  }, [items, t]);
+
+  if (isLoading) return <PageLoading />;
 
   const startEdit = (item: NavigationItem) => {
     setEditingId(item.id);
@@ -176,16 +259,16 @@ export default function AdminNavigationPage() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = items.findIndex((i) => i.id === active.id);
-    const newIndex = items.findIndex((i) => i.id === over.id);
+    const oldIndex = flatItems.findIndex((i) => i.id === active.id);
+    const newIndex = flatItems.findIndex((i) => i.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const newItems = [...items];
-    const [moved] = newItems.splice(oldIndex, 1);
-    newItems.splice(newIndex, 0, moved);
+    const reordered = [...flatItems];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
 
     reorderMutation.mutateAsync(
-      newItems.map((item, idx) => ({
+      reordered.map((item, idx) => ({
         id: item.id,
         sort_order: idx,
         parent_id: item.parent_id ?? null,
@@ -208,15 +291,16 @@ export default function AdminNavigationPage() {
 
       <Card>
         <div className="space-y-1">
-          {items.length === 0 ? (
+          {flatItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-gray-500">{t("noNavItems")}</p>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-                {items.map((item) => (
+              <SortableContext items={flatItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                {flatItems.map((item) => (
                   <SortableNavItem
                     key={item.id}
                     item={item}
+                    depth={item.depth}
                     editingId={editingId}
                     editLabel={editLabel}
                     setEditLabel={setEditLabel}
@@ -247,6 +331,7 @@ export default function AdminNavigationPage() {
                   href: formData.href || undefined,
                   icon: formData.icon || undefined,
                   operation_code: formData.operation_code || undefined,
+                  parent_id: formData.parent_id || null,
                   sort_order: items.length,
                   visible: true,
                 })
@@ -264,6 +349,12 @@ export default function AdminNavigationPage() {
             required
             value={formData.label}
             onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+          />
+          <Select
+            label={t("parentItem")}
+            value={formData.parent_id}
+            onChange={(e) => setFormData({ ...formData, parent_id: e.target.value })}
+            options={parentOptions}
           />
           <Input
             label={t("linkHref")}

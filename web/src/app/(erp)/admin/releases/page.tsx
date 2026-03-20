@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle, XCircle, Rocket } from "lucide-react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { useTranslations } from "next-intl";
@@ -19,6 +20,7 @@ import type { Release } from "@/lib/types/lowcode";
 export default function AdminReleasesPage() {
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const router = useRouter();
   const { page, pageSize, goToPage } = usePagination();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -127,7 +129,7 @@ export default function AdminReleasesPage() {
         total={data?.total || 0}
         totalPages={data?.total_pages || 1}
         onPageChange={goToPage}
-        onRowClick={setSelectedRelease}
+        onRowClick={(release) => router.push(`/admin/releases/${release.id}`)}
         isLoading={isLoading}
         emptyTitle={t("noReleasesFound")}
       />

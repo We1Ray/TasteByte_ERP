@@ -23,13 +23,17 @@ export function LookupModal({ open, onClose, title, config, onSelect }: LookupMo
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<{ value: string; label: string } | null>(null);
 
+  // Sanitize search to prevent SQL injection
+  const sanitizedSearch = search.replace(/[%_'"\\]/g, "");
+
   const { data, isLoading } = useQuery({
-    queryKey: ["lowcode", "lookup", config.operation_code, search],
+    queryKey: ["lowcode", "lookup", config.operation_code, sanitizedSearch],
     queryFn: () =>
       datasourceApi.query(
-        `SELECT * FROM ${config.operation_code} WHERE 1=1 ${search ? `AND CAST(${config.label_column} AS TEXT) ILIKE '%${search}%'` : ""} LIMIT 50`
+        `SELECT * FROM ${config.operation_code} WHERE 1=1 ${sanitizedSearch ? `AND CAST(${config.label_column} AS TEXT) ILIKE '%' || '${sanitizedSearch}' || '%'` : ""} LIMIT 50`
       ),
     enabled: open,
+    staleTime: 30000,
   });
 
   const handleConfirm = () => {

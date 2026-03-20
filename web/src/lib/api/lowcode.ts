@@ -406,6 +406,11 @@ export const releasesApi = {
     const response = await apiClient.put(`/lowcode/releases/${id}/publish`);
     return response.data;
   },
+
+  rollback: async (id: string): Promise<Release> => {
+    const response = await apiClient.post(`/lowcode/releases/${id}/rollback`);
+    return response.data;
+  },
 };
 
 // Feedback API
@@ -651,10 +656,24 @@ export const listExecutorApi = {
 export const importExportApi = {
   bulkImport: async (
     code: string,
-    records: Record<string, unknown>[]
-  ): Promise<{ inserted: number; errors: string[] }> => {
+    records: Record<string, unknown>[],
+    options?: { dry_run?: boolean; skip_invalid?: boolean }
+  ): Promise<{ inserted: number; skipped: number; errors: string[]; row_errors: { row_index: number; errors: { field_name: string; field_label: string; message: string }[] }[] }> => {
     const response = await apiClient.post(`/lowcode/exec/${code}/bulk-import`, {
       records,
+      dry_run: options?.dry_run ?? false,
+      skip_invalid: options?.skip_invalid ?? false,
+    });
+    return response.data;
+  },
+
+  export: async (
+    code: string,
+    format: "json" | "csv" = "json"
+  ): Promise<Blob> => {
+    const response = await apiClient.get(`/lowcode/exec/${code}/export`, {
+      params: { format },
+      responseType: "blob",
     });
     return response.data;
   },

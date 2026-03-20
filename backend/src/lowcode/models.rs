@@ -289,14 +289,14 @@ pub struct FormResponse {
     pub sections: Vec<SectionWithFields>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SectionWithFields {
     #[serde(flatten)]
     pub section: FormSection,
     pub fields: Vec<FieldWithOptions>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FieldWithOptions {
     #[serde(flatten)]
     pub field: FieldDefinition,
@@ -858,12 +858,43 @@ pub struct DocumentFlowEntry {
 #[derive(Debug, Deserialize)]
 pub struct BulkImportRequest {
     pub records: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub dry_run: bool,
+    #[serde(default)]
+    pub skip_invalid: bool,
 }
 
 #[derive(Debug, Serialize)]
 pub struct BulkImportResult {
     pub inserted: usize,
+    pub skipped: usize,
     pub errors: Vec<String>,
+    pub row_errors: Vec<BulkImportError>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkImportError {
+    pub row_index: usize,
+    pub errors: Vec<FieldError>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExportParams {
+    pub format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FieldError {
+    pub field_name: String,
+    pub field_label: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidationResult {
+    pub is_valid: bool,
+    pub errors: Vec<FieldError>,
+    pub prepared_data: serde_json::Value,
 }
 
 // ── List Query (user-facing execution) ────────────────────────────────

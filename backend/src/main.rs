@@ -32,6 +32,9 @@ async fn main() {
     // Init Prometheus metrics
     let metrics_handle = init_metrics();
 
+    // Init system start time for uptime tracking
+    backend::shared::admin_api::init_start_time();
+
     // Load config
     let settings = Settings::from_env();
     info!(

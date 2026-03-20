@@ -215,14 +215,53 @@ pub async fn create_data(
         ));
     }
 
+    // Field validation
+    let form = form_builder::get_form(&state.pool, operation.id).await?;
+    let all_fields: Vec<_> = form
+        .sections
+        .iter()
+        .flat_map(|s| s.fields.iter())
+        .cloned()
+        .collect();
+    let validation = crate::lowcode::services::field_validator::validate_for_create(
+        &state.pool,
+        operation.id,
+        &all_fields,
+        &input.data,
+        guard.claims.sub,
+    )
+    .await?;
+
+    if !validation.is_valid {
+        return Err(AppError::Validation(
+            serde_json::to_string(&validation.errors)
+                .unwrap_or_else(|_| "Validation failed".to_string()),
+        ));
+    }
+
     let record = sqlx::query_as::<_, OperationData>(
         "INSERT INTO lc_operation_data (operation_id, data, created_by) VALUES ($1, $2, $3) RETURNING *",
     )
     .bind(operation.id)
-    .bind(&input.data)
+    .bind(&validation.prepared_data)
     .bind(guard.claims.sub)
     .fetch_one(&state.pool)
     .await?;
+
+    // Audit log
+    if let Err(e) = crate::shared::audit::log_change(
+        &state.pool,
+        "lc_operation_data",
+        record.id,
+        "INSERT",
+        None,
+        Some(validation.prepared_data),
+        Some(guard.claims.sub),
+    )
+    .await
+    {
+        tracing::warn!("Audit log failed: {}", e);
+    }
 
     Ok(Json(ApiResponse::with_message(record, "Record created")))
 }
@@ -290,15 +329,82 @@ pub async fn update_data(
         ));
     }
 
+    // Get old record for audit
+    let old_record = sqlx::query_as::<_, OperationData>(
+        "SELECT * FROM lc_operation_data WHERE id = $1 AND operation_id = $2",
+    )
+    .bind(id)
+    .bind(operation.id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Record not found".to_string()))?;
+
+    // Determine masked fields
+    let form = form_builder::get_form(&state.pool, operation.id).await?;
+    let all_fields: Vec<_> = form
+        .sections
+        .iter()
+        .flat_map(|s| s.fields.iter())
+        .cloned()
+        .collect();
+    let mut masked_field_names = Vec::new();
+    for fwo in &all_fields {
+        let fp = permission_resolver::resolve_field_permission(
+            &state.pool,
+            fwo.field.id,
+            guard.claims.sub,
+        )
+        .await?;
+        if let Some(ref fp) = fp {
+            if fp.visibility == "MASKED" {
+                masked_field_names.push(fwo.field.field_name.clone());
+            }
+        }
+    }
+
+    // Field validation
+    let validation = crate::lowcode::services::field_validator::validate_for_update(
+        &state.pool,
+        operation.id,
+        id,
+        &all_fields,
+        &input.data,
+        guard.claims.sub,
+        &masked_field_names,
+    )
+    .await?;
+
+    if !validation.is_valid {
+        return Err(AppError::Validation(
+            serde_json::to_string(&validation.errors)
+                .unwrap_or_else(|_| "Validation failed".to_string()),
+        ));
+    }
+
     let record = sqlx::query_as::<_, OperationData>(
         "UPDATE lc_operation_data SET data = $3, updated_at = NOW() WHERE id = $1 AND operation_id = $2 RETURNING *",
     )
     .bind(id)
     .bind(operation.id)
-    .bind(&input.data)
+    .bind(&validation.prepared_data)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("Record not found".to_string()))?;
+
+    // Audit log
+    if let Err(e) = crate::shared::audit::log_change(
+        &state.pool,
+        "lc_operation_data",
+        record.id,
+        "UPDATE",
+        Some(old_record.data),
+        Some(validation.prepared_data),
+        Some(guard.claims.sub),
+    )
+    .await
+    {
+        tracing::warn!("Audit log failed: {}", e);
+    }
 
     Ok(Json(ApiResponse::with_message(record, "Record updated")))
 }
@@ -328,6 +434,15 @@ pub async fn delete_data(
         ));
     }
 
+    // Get old record for audit
+    let old_record = sqlx::query_as::<_, OperationData>(
+        "SELECT * FROM lc_operation_data WHERE id = $1 AND operation_id = $2",
+    )
+    .bind(id)
+    .bind(operation.id)
+    .fetch_optional(&state.pool)
+    .await?;
+
     let result = sqlx::query("DELETE FROM lc_operation_data WHERE id = $1 AND operation_id = $2")
         .bind(id)
         .bind(operation.id)
@@ -336,6 +451,23 @@ pub async fn delete_data(
 
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound("Record not found".to_string()));
+    }
+
+    // Audit log
+    if let Some(old) = old_record {
+        if let Err(e) = crate::shared::audit::log_change(
+            &state.pool,
+            "lc_operation_data",
+            id,
+            "DELETE",
+            Some(old.data),
+            None,
+            Some(guard.claims.sub),
+        )
+        .await
+        {
+            tracing::warn!("Audit log failed: {}", e);
+        }
     }
 
     Ok(Json(ApiResponse::with_message(

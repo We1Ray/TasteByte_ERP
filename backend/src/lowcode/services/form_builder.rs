@@ -72,6 +72,9 @@ pub async fn save_form(
     .execute(&mut *tx)
     .await?;
 
+    // Check for circular dependencies before proceeding
+    detect_circular_dependencies(&input.sections)?;
+
     // Delete existing sections (cascades to fields and options)
     sqlx::query("DELETE FROM lc_form_sections WHERE form_id = $1")
         .bind(form.id)
@@ -227,4 +230,47 @@ pub async fn create_snapshot(
     .await?;
 
     Ok(snapshot)
+}
+
+/// Detect circular dependencies in field depends_on references
+fn detect_circular_dependencies(sections: &[SaveSectionInput]) -> Result<(), AppError> {
+    use std::collections::{HashMap, HashSet};
+
+    // Build dependency graph: field_id/field_name -> depends_on
+    let mut deps: HashMap<String, String> = HashMap::new();
+    let mut id_to_name: HashMap<String, String> = HashMap::new();
+
+    for section in sections {
+        for field in &section.fields {
+            let key = field
+                .id
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| field.field_name.clone());
+            id_to_name.insert(key.clone(), field.field_name.clone());
+            if let Some(dep_id) = field.depends_on {
+                deps.insert(key, dep_id.to_string());
+            }
+        }
+    }
+
+    // DFS cycle detection
+    for start in deps.keys() {
+        let mut visited = HashSet::new();
+        let mut current = start.clone();
+        loop {
+            if !visited.insert(current.clone()) {
+                let name = id_to_name.get(start).unwrap_or(start);
+                return Err(AppError::Validation(format!(
+                    "Circular dependency detected involving field '{}'",
+                    name
+                )));
+            }
+            match deps.get(&current) {
+                Some(next) => current = next.clone(),
+                None => break,
+            }
+        }
+    }
+
+    Ok(())
 }

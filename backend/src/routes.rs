@@ -1,12 +1,13 @@
 use axum::extract::State;
 use axum::middleware as axum_mw;
-use axum::routing::get;
+use axum::routing::{delete, get, post, put};
 use axum::Json;
 use axum::Router;
 use rust_decimal::Decimal;
 use serde::Serialize;
 
 use crate::middleware::metrics::track_metrics;
+use crate::shared::admin_api;
 use crate::shared::types::{AppState, Claims};
 use crate::shared::{ApiResponse, AppError};
 
@@ -28,7 +29,8 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/workflow/history/{doc_type}/{doc_id}",
             get(crate::shared::handlers::get_status_history),
-        );
+        )
+        .nest("/system", system_routes());
 
     Router::new()
         .nest("/api/v1", api)
@@ -257,4 +259,62 @@ async fn dashboard_charts(
         monthly_revenue,
         monthly_orders,
     })))
+}
+
+fn system_routes() -> Router<AppState> {
+    Router::new()
+        // User preferences
+        .route(
+            "/preferences",
+            get(admin_api::get_user_preferences).put(admin_api::update_user_preferences),
+        )
+        // Saved variants
+        .route(
+            "/variants",
+            get(admin_api::list_variants).post(admin_api::create_variant),
+        )
+        .route("/variants/{id}", delete(admin_api::delete_variant))
+        // System health
+        .route("/health", get(admin_api::system_health))
+        // Global search
+        .route("/search", get(admin_api::global_search))
+        // Email management
+        .route(
+            "/email/templates",
+            get(admin_api::list_email_templates),
+        )
+        .route("/email/logs", get(admin_api::list_email_logs_handler))
+        // Scheduled jobs
+        .route(
+            "/jobs",
+            get(admin_api::list_scheduled_jobs).post(admin_api::create_scheduled_job),
+        )
+        .route(
+            "/jobs/{id}",
+            put(admin_api::toggle_scheduled_job).delete(admin_api::delete_scheduled_job),
+        )
+        .route("/jobs/{id}/logs", get(admin_api::get_job_logs))
+        // Webhooks
+        .route(
+            "/webhooks",
+            get(admin_api::list_webhooks_handler).post(admin_api::create_webhook_handler),
+        )
+        .route(
+            "/webhooks/{id}",
+            delete(admin_api::delete_webhook_handler),
+        )
+        // Print layouts
+        .route(
+            "/print/layouts",
+            get(admin_api::list_print_layouts_handler).post(admin_api::save_print_layout_handler),
+        )
+        .route(
+            "/print/render/{layout_code}",
+            post(admin_api::render_print_handler),
+        )
+        // Transport orders
+        .route(
+            "/transports",
+            get(admin_api::list_transport_orders).post(admin_api::create_transport_order),
+        )
 }

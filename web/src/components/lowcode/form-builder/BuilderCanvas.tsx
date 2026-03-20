@@ -91,34 +91,79 @@ const SortableField = React.memo(function SortableField({
     ? t(fieldTypeLabelKeys[field.field_type])
     : field.field_type;
 
+  // Determine column span class based on field width
+  const widthSpanClass = field.width === "full" ? "col-span-full"
+    : field.width === "half" ? "col-span-1"
+    : field.width === "third" ? "col-span-1"
+    : field.width === "quarter" ? "col-span-1"
+    : "col-span-1";
+
+  const hasVisibilityRule = !!(field.visibility_rule && (field.visibility_rule as { dependent_field?: string }).dependent_field);
+  const isRequired = field.validation?.required;
+  const hasValidation = field.validation?.min_length || field.validation?.max_length ||
+    field.validation?.regex_pattern || field.validation?.min_value || field.validation?.max_value;
+  const hasDefaultValue = !!field.default_value;
+
+  // Width label for display
+  const widthLabels: Record<string, string> = { full: "100%", half: "50%", third: "33%", quarter: "25%" };
+  const widthLabel = widthLabels[field.width || ""] || "";
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-2 rounded-md border bg-white px-3 py-2 transition-colors",
-        selectedFieldId === field.id ? "border-blue-500 ring-1 ring-blue-500" : "border-gray-200",
-        isDragging && "opacity-50"
+        "group relative flex items-center gap-2 rounded-md border bg-white px-3 py-2.5 transition-all",
+        selectedFieldId === field.id
+          ? "border-blue-500 ring-2 ring-blue-200 shadow-sm"
+          : "border-gray-200 hover:border-gray-300 hover:shadow-sm",
+        isDragging && "opacity-50",
+        widthSpanClass
       )}
       onClick={() => selectField(field.id)}
     >
       <button
-        className="cursor-grab text-gray-400 hover:text-gray-600"
+        className="cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="flex-1 min-w-0">
-        <p className="truncate text-sm font-medium text-gray-700">{field.label}</p>
-        <p className="text-xs text-gray-400">{fieldTypeLabel} - {field.field_key}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-sm font-medium text-gray-700">{field.label}</p>
+          {/* Indicator badges */}
+          {isRequired && (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[9px] font-bold text-amber-600" title={t("required")}>!</span>
+          )}
+          {hasValidation && (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold text-emerald-600" title={t("validation")}>V</span>
+          )}
+          {hasVisibilityRule && (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[9px] font-bold text-indigo-600" title={t("visibilityRule")}>R</span>
+          )}
+          {hasDefaultValue && (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[9px] font-bold text-sky-600" title={t("defaultValue")}>D</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <span>{fieldTypeLabel}</span>
+          <span>·</span>
+          <span className="font-mono">{field.field_key}</span>
+          {widthLabel && (
+            <>
+              <span>·</span>
+              <span className="rounded bg-gray-100 px-1 text-[10px] font-medium text-gray-500">{widthLabel}</span>
+            </>
+          )}
+        </div>
       </div>
       <button
         onClick={(e) => {
           e.stopPropagation();
           deleteField(field.id);
         }}
-        className="text-gray-400 hover:text-red-500"
+        className="text-gray-300 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
       >
         <Trash2 className="h-4 w-4" />
       </button>
@@ -185,8 +230,14 @@ const SortableSection = React.memo(function SortableSection({
           onClick={() => selectSection(section.id)}
         >
           <h4 className="text-sm font-semibold text-gray-900">{section.title}</h4>
+          <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+            {section.columns || 2} {t("columns")}
+          </span>
           {section.description && (
             <p className="text-xs text-gray-500">{section.description}</p>
+          )}
+          {section.collapsible && (
+            <span className="text-[10px] text-gray-400">{t("collapsible")}</span>
           )}
         </div>
         <button
@@ -207,7 +258,14 @@ const SortableSection = React.memo(function SortableSection({
         items={sortedFields.map((f) => f.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2">
+        <div className={cn(
+          "grid gap-2",
+          section.columns === 1 && "grid-cols-1",
+          section.columns === 2 && "grid-cols-2",
+          section.columns === 3 && "grid-cols-3",
+          section.columns === 4 && "grid-cols-4",
+          !section.columns && "grid-cols-2"
+        )}>
           {sortedFields.map((field) => (
             <SortableField key={field.id} field={field} sectionId={section.id} />
           ))}

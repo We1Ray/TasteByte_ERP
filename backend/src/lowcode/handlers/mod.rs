@@ -4,6 +4,7 @@ pub mod dashboard_builder;
 pub mod datasource;
 pub mod document_flow;
 pub mod executor;
+pub mod export;
 pub mod feedback;
 pub mod fields;
 pub mod files;

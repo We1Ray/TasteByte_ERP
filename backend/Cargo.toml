@@ -27,11 +27,16 @@ hex = "0.4"
 dotenvy = "0.15"
 rand = "0.8"
 csv = "1.3"
+regex = "1"
 sqlparser = { version = "0.53", features = ["visitor"] }
 sentry = { version = "0.35", features = ["tracing"] }
 metrics = "0.24"
 metrics-exporter-prometheus = "0.16"
 reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+lettre = { version = "0.11", features = ["tokio1-native-tls", "builder"] }
+tera = "1"
+tokio-cron-scheduler = "0.13"
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 
 [dev-dependencies]
 axum-test = "18"

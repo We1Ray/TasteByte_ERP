@@ -13,11 +13,13 @@ import { SectionEditor } from "./SectionEditor";
 import { TableSchemaBrowser } from "./TableSchemaBrowser";
 import { MasterDetailConfigPanel } from "./MasterDetailConfigPanel";
 import { ApprovalConfigPanel } from "./ApprovalConfigPanel";
+import { FieldPermissionPanel } from "./FieldPermissionPanel";
 import type { FieldDefinition } from "@/lib/types/lowcode";
 
 function FieldPropertyEditor({ field }: { field: FieldDefinition }) {
   const { updateField } = useBuilderStore();
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
+  const [permissionOpen, setPermissionOpen] = useState(false);
   const params = useParams();
   const operationId = params?.id as string;
   const { data: operation } = useApiQuery(
@@ -573,6 +575,152 @@ function FieldPropertyEditor({ field }: { field: FieldDefinition }) {
               }
             />
           )}
+        </>
+      )}
+
+      {/* ── Visibility Rules ── */}
+      <hr className="border-gray-200" />
+      <details className="group" open={!!field.visibility_rule}>
+        <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold text-gray-900">
+          <span className="flex items-center gap-2">
+            {t("visibilityRules")}
+            {field.visibility_rule && (field.visibility_rule as any).dependent_field && (
+              <span className="inline-flex h-5 items-center rounded-full bg-indigo-100 px-2 text-xs font-medium text-indigo-700">
+                {t("active")}
+              </span>
+            )}
+          </span>
+          <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div className="mt-3 space-y-3">
+          <VisibilityRulesEditor field={field} onUpdate={update} />
+        </div>
+      </details>
+
+      {field.field_type === "lookup" && (
+        <>
+          <hr className="border-gray-200" />
+          <h4 className="text-sm font-semibold text-gray-900">{t("lookupConfig")}</h4>
+          <Input
+            label={t("lookupOperationCode")}
+            value={(field.field_config?.operation_code as string) || ""}
+            placeholder={t("lookupOperationCodePlaceholder")}
+            onChange={(e) => update({ field_config: { ...field.field_config, operation_code: e.target.value || undefined } })}
+          />
+          <Input
+            label={t("valueColumn")}
+            value={(field.field_config?.value_column as string) || ""}
+            onChange={(e) => update({ field_config: { ...field.field_config, value_column: e.target.value || undefined } })}
+          />
+          <Input
+            label={t("labelColumn")}
+            value={(field.field_config?.label_column as string) || ""}
+            onChange={(e) => update({ field_config: { ...field.field_config, label_column: e.target.value || undefined } })}
+          />
+          <Input
+            label={t("displayColumns")}
+            value={((field.field_config?.display_columns as string[]) || []).join(", ")}
+            placeholder={t("displayColumnsPlaceholder")}
+            onChange={(e) => update({
+              field_config: {
+                ...field.field_config,
+                display_columns: e.target.value ? e.target.value.split(",").map(c => c.trim()).filter(Boolean) : undefined,
+              },
+            })}
+          />
+        </>
+      )}
+
+      <hr className="border-gray-200" />
+      <button
+        type="button"
+        onClick={() => setPermissionOpen(true)}
+        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+      >
+        {t("fieldPermissions")}
+      </button>
+      {permissionOpen && (
+        <FieldPermissionPanel
+          fieldId={field.id}
+          onClose={() => setPermissionOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function VisibilityRulesEditor({ field, onUpdate }: { field: FieldDefinition; onUpdate: (updates: Partial<FieldDefinition>) => void }) {
+  const t = useTranslations("lowcode");
+  const { sections } = useBuilderStore();
+
+  // Get all fields except current one (for dependent field selection)
+  const otherFields = sections.flatMap(s => s.fields).filter(f => f.id !== field.id);
+
+  const rule = (field.visibility_rule as { dependent_field?: string; operator?: string; value?: string; action?: string }) || {};
+
+  const updateRule = (updates: Record<string, string>) => {
+    onUpdate({ visibility_rule: { ...rule, ...updates } as any });
+  };
+
+  return (
+    <div className="space-y-3">
+      <Select
+        label={t("visibilityAction")}
+        value={rule.action || "show"}
+        onChange={(e) => updateRule({ action: e.target.value })}
+        options={[
+          { value: "show", label: t("showWhen") },
+          { value: "hide", label: t("hideWhen") },
+        ]}
+      />
+      <Select
+        label={t("dependentField")}
+        value={rule.dependent_field || ""}
+        onChange={(e) => updateRule({ dependent_field: e.target.value })}
+        options={[
+          { value: "", label: t("selectField") },
+          ...otherFields.map(f => ({ value: f.field_key, label: f.label })),
+        ]}
+      />
+      <Select
+        label={t("operator")}
+        value={rule.operator || "equals"}
+        onChange={(e) => updateRule({ operator: e.target.value })}
+        options={[
+          { value: "equals", label: t("opEquals") },
+          { value: "not_equals", label: t("opNotEquals") },
+          { value: "contains", label: t("opContains") },
+          { value: "gt", label: t("opGreaterThan") },
+          { value: "lt", label: t("opLessThan") },
+        ]}
+      />
+      <Input
+        label={t("conditionValue")}
+        value={String(rule.value ?? "")}
+        onChange={(e) => updateRule({ value: e.target.value })}
+      />
+      {rule.dependent_field && (
+        <>
+          {/* Rule preview */}
+          <div className="rounded-md bg-indigo-50 p-2">
+            <p className="text-xs text-indigo-700">
+              <span className="font-medium">{t("logicPreview")}:</span>{" "}
+              {rule.action === "show" ? t("showWhen") : t("hideWhen")}{" "}
+              <span className="font-mono font-semibold">{otherFields.find(f => f.field_key === rule.dependent_field)?.label || rule.dependent_field}</span>{" "}
+              {rule.operator === "equals" ? "=" : rule.operator === "not_equals" ? "≠" : rule.operator === "contains" ? "∋" : rule.operator === "gt" ? ">" : "<"}{" "}
+              &quot;{rule.value}&quot;
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              className="text-xs text-red-500 hover:text-red-700"
+              onClick={() => onUpdate({ visibility_rule: null as any })}
+            >
+              {t("clearRule")}
+            </button>
+            <span className="text-xs text-gray-400">{t("logicDesignerHint2")}</span>
+          </div>
         </>
       )}
     </div>

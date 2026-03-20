@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/api/client";
 import type { OperationButton } from "@/lib/types/lowcode";
@@ -15,7 +17,10 @@ interface Props {
 
 export function OperationToolbar({ buttons, operationCode }: Props) {
   const router = useRouter();
+  const t = useTranslations("lowcode");
+  const tCommon = useTranslations("common");
   const [confirmBtn, setConfirmBtn] = useState<OperationButton | null>(null);
+  const [modalBtn, setModalBtn] = useState<OperationButton | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
 
   const executeAction = async (btn: OperationButton) => {
@@ -39,16 +44,28 @@ export function OperationToolbar({ buttons, operationCode }: Props) {
           } else {
             await apiClient.post(url, btn.action_config.body || {});
           }
-          toast.success(`${btn.label} executed successfully`);
+          toast.success(t("actionSuccess", { action: btn.label }));
           break;
         }
-        case "MODAL":
-        case "CUSTOM_JS":
-          toast.info(`${btn.action_type} actions coming soon`);
+        case "MODAL": {
+          setModalBtn(btn);
           break;
+        }
+        case "CUSTOM_JS": {
+          const jsCode = (btn.action_config.code as string) || "";
+          if (jsCode) {
+            try {
+              const fn = new Function("operationCode", "toast", jsCode);
+              fn(operationCode, toast);
+            } catch (jsErr) {
+              toast.error(t("actionFailed", { action: btn.label }));
+            }
+          }
+          break;
+        }
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Action failed";
+      const message = err instanceof Error ? err.message : t("actionFailed", { action: btn.label });
       toast.error(message);
     } finally {
       setLoading(null);
@@ -96,11 +113,35 @@ export function OperationToolbar({ buttons, operationCode }: Props) {
             setConfirmBtn(null);
           }
         }}
-        title={confirmBtn?.label || "Confirm"}
-        message={confirmBtn?.confirm_message || "Are you sure?"}
-        confirmLabel="Confirm"
+        title={confirmBtn?.label || tCommon("confirm")}
+        message={confirmBtn?.confirm_message || tCommon("areYouSure")}
+        confirmLabel={tCommon("confirm")}
         variant="danger"
       />
+
+      {modalBtn && (
+        <Modal
+          open={true}
+          onClose={() => setModalBtn(null)}
+          title={modalBtn.label}
+          size={(modalBtn.action_config.size as "sm" | "md" | "lg" | "xl") || "md"}
+        >
+          {modalBtn.action_config.content ? (
+            <div
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: String(modalBtn.action_config.content) }}
+            />
+          ) : modalBtn.action_config.url ? (
+            <iframe
+              src={String(modalBtn.action_config.url)}
+              className="h-96 w-full rounded-md border-0"
+              title={modalBtn.label}
+            />
+          ) : (
+            <p className="text-sm text-gray-500">{t("noContentConfigured")}</p>
+          )}
+        </Modal>
+      )}
     </>
   );
 }

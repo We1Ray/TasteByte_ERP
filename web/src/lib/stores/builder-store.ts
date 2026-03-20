@@ -3,6 +3,59 @@
 import { create } from "zustand";
 import type { FormSection, FieldDefinition, FormSettings, LayoutConfig } from "../types/lowcode";
 
+const MAX_HISTORY = 50;
+
+const SESSION_KEY_PREFIX = "builder-state-";
+
+function getSessionKey(operationId: string) {
+  return `${SESSION_KEY_PREFIX}${operationId}`;
+}
+
+interface PersistedState {
+  sections: FormSection[];
+  formSettings: FormSettings;
+  layoutConfig: LayoutConfig;
+  history: FormSection[][];
+  future: FormSection[][];
+  isDirty: boolean;
+}
+
+function saveToSession(operationId: string | null, state: BuilderState) {
+  if (!operationId) return;
+  try {
+    const data: PersistedState = {
+      sections: state.sections,
+      formSettings: state.formSettings,
+      layoutConfig: state.layoutConfig,
+      history: state.history,
+      future: state.future,
+      isDirty: state.isDirty,
+    };
+    sessionStorage.setItem(getSessionKey(operationId), JSON.stringify(data));
+  } catch {
+    // sessionStorage may be full or unavailable
+  }
+}
+
+function loadFromSession(operationId: string): PersistedState | null {
+  try {
+    const raw = sessionStorage.getItem(getSessionKey(operationId));
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore parse errors
+  }
+  return null;
+}
+
+function clearSession(operationId: string | null) {
+  if (!operationId) return;
+  try {
+    sessionStorage.removeItem(getSessionKey(operationId));
+  } catch {
+    // ignore
+  }
+}
+
 interface BuilderState {
   sections: FormSection[];
   formSettings: FormSettings;
@@ -10,6 +63,11 @@ interface BuilderState {
   selectedFieldId: string | null;
   selectedSectionId: string | null;
   isDirty: boolean;
+  history: FormSection[][];
+  future: FormSection[][];
+  canUndo: boolean;
+  canRedo: boolean;
+  operationId: string | null;
   setSections: (sections: FormSection[]) => void;
   setFormSettings: (settings: FormSettings) => void;
   setLayoutConfig: (config: LayoutConfig) => void;
@@ -27,6 +85,19 @@ interface BuilderState {
   reorderSections: (activeId: string, overId: string) => void;
   reorderFields: (sectionId: string, activeId: string, overId: string) => void;
   markClean: () => void;
+  undo: () => void;
+  redo: () => void;
+  setOperationId: (id: string) => void;
+}
+
+function pushHistory(state: BuilderState): Pick<BuilderState, "history" | "future" | "canUndo" | "canRedo"> {
+  const newHistory = [...state.history, state.sections].slice(-MAX_HISTORY);
+  return {
+    history: newHistory,
+    future: [],
+    canUndo: true,
+    canRedo: false,
+  };
 }
 
 export const useBuilderStore = create<BuilderState>((set) => ({
@@ -36,8 +107,22 @@ export const useBuilderStore = create<BuilderState>((set) => ({
   selectedFieldId: null,
   selectedSectionId: null,
   isDirty: false,
+  history: [],
+  future: [],
+  canUndo: false,
+  canRedo: false,
+  operationId: null,
 
-  setSections: (sections) => set({ sections, isDirty: false }),
+  setSections: (sections) => set((state) => {
+    // If we have unsaved work in session, don't overwrite
+    if (state.operationId) {
+      const saved = loadFromSession(state.operationId);
+      if (saved && saved.isDirty) {
+        return {}; // Keep current state (already restored via setOperationId)
+      }
+    }
+    return { sections, isDirty: false, history: [], future: [], canUndo: false, canRedo: false };
+  }),
 
   setFormSettings: (settings) => set({ formSettings: settings }),
   setLayoutConfig: (config) => set({ layoutConfig: config }),
@@ -54,12 +139,14 @@ export const useBuilderStore = create<BuilderState>((set) => ({
 
   addSection: (section) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: [...state.sections, section],
       isDirty: true,
     })),
 
   updateSection: (id, updates) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: state.sections.map((s) =>
         s.id === id ? { ...s, ...updates } : s
       ),
@@ -68,6 +155,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
 
   deleteSection: (id) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: state.sections.filter((s) => s.id !== id),
       selectedSectionId: state.selectedSectionId === id ? null : state.selectedSectionId,
       selectedFieldId: null,
@@ -76,6 +164,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
 
   addField: (sectionId, field) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: state.sections.map((s) =>
         s.id === sectionId ? { ...s, fields: [...s.fields, field] } : s
       ),
@@ -84,6 +173,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
 
   updateField: (id, updates) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: state.sections.map((s) => ({
         ...s,
         fields: s.fields.map((f) =>
@@ -95,6 +185,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
 
   deleteField: (id) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: state.sections.map((s) => ({
         ...s,
         fields: s.fields.filter((f) => f.id !== id),
@@ -116,6 +207,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
       });
       if (!movedField) return state;
       return {
+        ...pushHistory(state),
         sections: sections.map((s) => {
           if (s.id === toSectionId) {
             const newFields = [...s.fields];
@@ -140,11 +232,16 @@ export const useBuilderStore = create<BuilderState>((set) => ({
       const newSections = [...state.sections];
       const [moved] = newSections.splice(oldIndex, 1);
       newSections.splice(newIndex, 0, moved);
-      return { sections: newSections.map((s, i) => ({ ...s, sort_order: i })), isDirty: true };
+      return {
+        ...pushHistory(state),
+        sections: newSections.map((s, i) => ({ ...s, sort_order: i })),
+        isDirty: true,
+      };
     }),
 
   reorderFields: (sectionId, activeId, overId) =>
     set((state) => ({
+      ...pushHistory(state),
       sections: state.sections.map((s) => {
         if (s.id !== sectionId) return s;
         const oldIndex = s.fields.findIndex((f) => f.id === activeId);
@@ -158,5 +255,66 @@ export const useBuilderStore = create<BuilderState>((set) => ({
       isDirty: true,
     })),
 
-  markClean: () => set({ isDirty: false }),
+  markClean: () => set((state) => {
+    clearSession(state.operationId);
+    return { isDirty: false };
+  }),
+
+  undo: () =>
+    set((state) => {
+      if (state.history.length === 0) return state;
+      const newHistory = [...state.history];
+      const previous = newHistory.pop()!;
+      return {
+        history: newHistory,
+        future: [state.sections, ...state.future],
+        sections: previous,
+        isDirty: true,
+        canUndo: newHistory.length > 0,
+        canRedo: true,
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      if (state.future.length === 0) return state;
+      const newFuture = [...state.future];
+      const next = newFuture.shift()!;
+      return {
+        history: [...state.history, state.sections],
+        future: newFuture,
+        sections: next,
+        isDirty: true,
+        canUndo: true,
+        canRedo: newFuture.length > 0,
+      };
+    }),
+
+  setOperationId: (id) => set((state) => {
+    const saved = loadFromSession(id);
+    if (saved && saved.isDirty) {
+      // Restore unsaved work from session
+      return {
+        operationId: id,
+        sections: saved.sections,
+        formSettings: saved.formSettings,
+        layoutConfig: saved.layoutConfig,
+        history: saved.history,
+        future: saved.future,
+        isDirty: true,
+        canUndo: saved.history.length > 0,
+        canRedo: saved.future.length > 0,
+      };
+    }
+    return { operationId: id };
+  }),
 }));
+
+// Auto-save to sessionStorage on changes (debounced)
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+useBuilderStore.subscribe((state) => {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveToSession(state.operationId, state);
+  }, 500);
+});

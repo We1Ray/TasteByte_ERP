@@ -23,7 +23,9 @@ type ImportStep = "upload" | "mapping" | "preview" | "result";
 
 interface ImportResult {
   inserted: number;
+  skipped?: number;
   errors: string[];
+  row_errors?: { row_index: number; errors: { field_name: string; field_label: string; message: string }[] }[];
 }
 
 export function CsvImportModal({
@@ -44,6 +46,8 @@ export function CsvImportModal({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [fileName, setFileName] = useState("");
+  const [dryRun, setDryRun] = useState(true);
+  const [skipInvalid, setSkipInvalid] = useState(false);
 
   const resetState = () => {
     setStep("upload");
@@ -53,6 +57,8 @@ export function CsvImportModal({
     setImporting(false);
     setResult(null);
     setFileName("");
+    setDryRun(true);
+    setSkipInvalid(false);
   };
 
   const handleClose = () => {
@@ -136,7 +142,8 @@ export function CsvImportModal({
     try {
       const importResult = await importExportApi.bulkImport(
         operationCode,
-        mappedData
+        mappedData,
+        { dry_run: dryRun, skip_invalid: skipInvalid }
       );
       setResult(importResult);
       setStep("result");
@@ -190,6 +197,17 @@ export function CsvImportModal({
                 {t("importRecords", { count: mappedData.length })}
               </Button>
             </>
+          )}
+          {step === "result" && result && dryRun && (
+            <Button
+              onClick={() => {
+                setDryRun(false);
+                setStep("preview");
+                setResult(null);
+              }}
+            >
+              {t("proceedImport")}
+            </Button>
           )}
           {step === "result" && (
             <Button onClick={handleClose}>{tCommon("close")}</Button>
@@ -320,13 +338,52 @@ export function CsvImportModal({
           <p className="text-xs text-gray-500">
             {t("totalRecords", { count: mappedData.length })}
           </p>
+
+          <div className="flex items-center gap-4 rounded-md bg-gray-50 p-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={dryRun}
+                onChange={(e) => setDryRun(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600"
+              />
+              <span className="text-sm text-gray-700">{t("dryRun")}</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={skipInvalid}
+                onChange={(e) => setSkipInvalid(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600"
+              />
+              <span className="text-sm text-gray-700">{t("skipInvalid")}</span>
+            </label>
+          </div>
+
+          <div className="rounded-md bg-blue-50 p-3">
+            <p className="text-sm text-blue-700">
+              {t("importSummary", { total: mappedData.length })}
+            </p>
+          </div>
         </div>
       )}
 
       {/* Step: Result */}
       {step === "result" && result && (
         <div className="space-y-4">
-          {result.inserted > 0 && (
+          {result && dryRun && result.inserted > 0 && (
+            <div className="flex items-start gap-3 rounded-md bg-blue-50 p-4">
+              <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-800">{t("dryRunComplete")}</p>
+                <p className="text-sm text-blue-700">
+                  {t("dryRunSummary", { valid: result.inserted, invalid: result.skipped || 0 })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {result.inserted > 0 && !dryRun && (
             <div className="flex items-start gap-3 rounded-md bg-green-50 p-4">
               <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
               <div>
@@ -355,6 +412,25 @@ export function CsvImportModal({
                   </ul>
                 </div>
               </div>
+            </div>
+          )}
+
+          {result.row_errors && result.row_errors.length > 0 && (
+            <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
+              {result.row_errors.map((re: { row_index: number; errors: { field_name: string; field_label: string; message: string }[] }, i: number) => (
+                <div key={i} className="rounded-md border border-red-200 bg-red-50 p-2">
+                  <p className="text-xs font-medium text-red-700">
+                    {t("rowError", { row: re.row_index + 1 })}
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {re.errors.map((err: { field_label: string; message: string }, j: number) => (
+                      <li key={j} className="text-xs text-red-600">
+                        {err.field_label}: {err.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           )}
         </div>
