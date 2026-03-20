@@ -129,21 +129,21 @@ ON CONFLICT DO NOTHING;
 -- ══════════════════════════════════════════════════════════════════════
 
 INSERT INTO approval_matrices (id, name, operation_id, description, is_active) VALUES
-('am000000-0000-0000-0000-000000000001', '請假簽核', 'd6000000-0000-0000-0000-000000000001', '依請假天數分級簽核：1-3天主管簽核，3天以上需人資加簽', true)
+('a0a00000-0000-0000-0000-000000000001', '請假簽核', 'd6000000-0000-0000-0000-000000000001', '依請假天數分級簽核：1-3天主管簽核，3天以上需人資加簽', true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO approval_levels (id, matrix_id, level_order, name, condition_field, condition_operator, condition_value, approver_type, approver_role, sla_hours, auto_escalate) VALUES
-('al000000-0000-0000-0000-000000000001', 'am000000-0000-0000-0000-000000000001', 1, '直屬主管', null, 'gte', null, 'ROLE', 'ADMIN', 24, false),
-('al000000-0000-0000-0000-000000000002', 'am000000-0000-0000-0000-000000000001', 2, '人資經理', 'days', 'gte', 3, 'ROLE', 'HR_MANAGER', 48, true)
+('a1a00000-0000-0000-0000-000000000001', 'a0a00000-0000-0000-0000-000000000001', 1, '直屬主管', null, 'gte', null, 'ROLE', 'ADMIN', 24, false),
+('a1a00000-0000-0000-0000-000000000002', 'a0a00000-0000-0000-0000-000000000001', 2, '人資經理', 'days', 'gte', 3, 'ROLE', 'HR_MANAGER', 48, true)
 ON CONFLICT DO NOTHING;
 
 -- 供應商評鑑: D級需主管覆核
 INSERT INTO approval_matrices (id, name, operation_id, description, is_active) VALUES
-('am000000-0000-0000-0000-000000000002', '供應商評鑑覆核', 'd4000000-0000-0000-0000-000000000001', 'D級供應商評鑑需主管覆核確認', true)
+('a0a00000-0000-0000-0000-000000000002', '供應商評鑑覆核', 'd4000000-0000-0000-0000-000000000001', 'D級供應商評鑑需主管覆核確認', true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO approval_levels (id, matrix_id, level_order, name, condition_field, condition_operator, condition_value, approver_type, approver_role, sla_hours) VALUES
-('al000000-0000-0000-0000-000000000003', 'am000000-0000-0000-0000-000000000002', 1, '採購主管覆核', 'overall_score', 'lte', 60, 'ROLE', 'MM_MANAGER', 48)
+('a1a00000-0000-0000-0000-000000000003', 'a0a00000-0000-0000-0000-000000000002', 1, '採購主管覆核', 'overall_score', 'lte', 60, 'ROLE', 'MM_MANAGER', 48)
 ON CONFLICT DO NOTHING;
 
 -- ══════════════════════════════════════════════════════════════════════

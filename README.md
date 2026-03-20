@@ -1,15 +1,16 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Rust-Axum-orange?style=for-the-badge&logo=rust" />
-  <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js" />
+  <img src="https://img.shields.io/badge/Rust-Axum_0.8-orange?style=for-the-badge&logo=rust" />
+  <img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" />
   <img src="https://img.shields.io/badge/PostgreSQL-17-336791?style=for-the-badge&logo=postgresql" />
-  <img src="https://img.shields.io/badge/Flutter-3.10-02569B?style=for-the-badge&logo=flutter" />
-  <img src="https://img.shields.io/badge/Swift-5.9-FA7343?style=for-the-badge&logo=swift" />
+  <img src="https://img.shields.io/badge/Tests-256_pass-brightgreen?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter" />
+  <img src="https://img.shields.io/badge/Swift-6.0-FA7343?style=for-the-badge&logo=swift" />
   <img src="https://img.shields.io/badge/Kotlin-1.9-7F52FF?style=for-the-badge&logo=kotlin" />
 </p>
 
 # TasteByte ERP
 
-> A production-grade, full-stack Enterprise Resource Planning system built for the food & beverage industry — featuring 8 SAP-style modules, a low-code platform, and multi-platform clients.
+> A production-grade, full-stack Enterprise Resource Planning system built for the food & beverage industry — featuring 8 SAP-style modules, a YAML-driven low-code platform, 260+ API endpoints, 123 database tables, and multi-platform clients (Web + iOS + Android + Flutter).
 
 ---
 
@@ -57,7 +58,7 @@
                              │          │          │
                     ┌────────▼──┐  ┌────▼────┐  ┌──▼──────────┐
                     │  Next.js  │  │   iOS   │  │  Android /  │
-                    │  15 Web   │  │  Swift  │  │  Flutter    │
+                    │  16 Web   │  │  Swift  │  │  Flutter    │
                     │  :3000    │  │  UI     │  │  Mobile     │
                     └────────┬──┘  └────┬────┘  └──┬──────────┘
                              │          │          │
@@ -66,13 +67,13 @@
                               ┌─────────▼─────────┐
                               │   Rust / Axum      │
                               │   Backend :8000    │
-                              │   160+ Endpoints   │
+                              │   260+ Endpoints   │
                               └─────────┬──────────┘
                                         │ SQLx (compile-time checked)
                               ┌─────────▼──────────┐
                               │   PostgreSQL 17     │
-                              │   74 Tables         │
-                              │   31 Migrations     │
+                              │   123 Tables        │
+                              │   44 Migrations     │
                               └────────────────────┘
 ```
 
@@ -426,7 +427,7 @@ The system ships with **three mobile clients** for field operations:
 |-------|-----------|---------|
 | **Backend** | Rust + Axum + Tokio | High-performance async API server |
 | **Database** | PostgreSQL 17 + SQLx | Compile-time checked SQL queries |
-| **Web Frontend** | Next.js 15 + React 19 + Tailwind CSS 4 | Modern SSR/CSR hybrid |
+| **Web Frontend** | Next.js 16 + React 19 + Tailwind CSS 4 | Modern SSR/CSR hybrid |
 | **State Management** | Zustand + TanStack Query | Client state + server cache |
 | **Tables** | TanStack Table | Headless table with sorting/filtering |
 | **Forms** | React Hook Form + Zod | Type-safe form validation |
@@ -444,10 +445,11 @@ The system ships with **three mobile clients** for field operations:
 
 ### Prerequisites
 
-- Rust (2021 edition)
-- Node.js 20+ & pnpm
+- Rust 1.75+ (2021 edition)
+- Node.js 20+ & pnpm 9+
 - PostgreSQL 17
-- Docker & Docker Compose (optional)
+- Docker & Docker Compose (optional, recommended)
+- Flutter SDK 3.x+ (for cross-platform mobile)
 
 ### Docker (Recommended)
 
@@ -500,28 +502,29 @@ make db-restore   # Restore database
 
 ```
 TasteByte_ERP/
-├── backend/                # Rust/Axum API (160+ endpoints)
+├── backend/                # Rust/Axum API (260+ endpoints)
 │   ├── src/
-│   │   ├── auth/           # Authentication & RBAC
-│   │   ├── fi/             # Financial Accounting (23 endpoints)
-│   │   ├── co/             # Controlling (12 endpoints)
-│   │   ├── mm/             # Materials Management (23 endpoints)
-│   │   ├── sd/             # Sales & Distribution (15 endpoints)
-│   │   ├── pp/             # Production Planning (10 endpoints)
-│   │   ├── hr/             # Human Resources (11 endpoints)
+│   │   ├── auth/           # Authentication & RBAC (14 endpoints)
+│   │   ├── fi/             # Financial Accounting (19 endpoints)
+│   │   ├── co/             # Controlling (9 endpoints)
+│   │   ├── mm/             # Materials Management (24 endpoints)
+│   │   ├── sd/             # Sales & Distribution (13 endpoints)
+│   │   ├── pp/             # Production Planning (11 endpoints)
+│   │   ├── hr/             # Human Resources (18 endpoints)
 │   │   ├── wm/             # Warehouse Management (10 endpoints)
 │   │   ├── qm/             # Quality Management (9 endpoints)
-│   │   ├── lowcode/        # Low-Code Platform (67+ endpoints)
-│   │   ├── notifications/  # Notification system
+│   │   ├── lowcode/        # Low-Code Platform (71 endpoints)
+│   │   ├── notifications/  # Notification system (5 endpoints)
 │   │   ├── middleware/      # CORS, logging, metrics, rate limiting
-│   │   └── shared/         # Common utilities, error handling, pagination
-│   ├── migrations/         # 31 PostgreSQL migrations (74 tables)
+│   │   └── shared/         # Common utilities, admin API (55 system endpoints)
+│   ├── operations/         # YAML operation definitions (7 files)
+│   ├── migrations/         # 44 PostgreSQL migrations (123 tables)
 │   └── tests/              # Integration tests (10 modules)
-├── web/                    # Next.js 15 Frontend
+├── web/                    # Next.js 16 Frontend
 │   ├── src/
 │   │   ├── app/            # App Router pages (14 module routes)
 │   │   ├── components/     # Reusable UI (40+ components)
-│   │   ├── lib/            # API clients, hooks, stores, types
+│   │   ├── lib/            # API clients (16), hooks (8), stores (7), types
 │   │   └── __tests__/      # Vitest unit tests (96 tests)
 │   ├── e2e/                # Playwright E2E tests (5 specs)
 │   └── messages/           # i18n (en.json, zh-TW.json)
@@ -547,19 +550,23 @@ Base URL: `http://localhost:8000/api/v1`
 
 | Module | Endpoints | Example |
 |--------|-----------|---------|
-| Auth | 5 | `POST /auth/login`, `POST /auth/refresh` |
-| FI | 23 | `GET /fi/accounts`, `POST /fi/journal-entries` |
-| CO | 12 | `GET /co/cost-centers`, `POST /co/allocations` |
-| MM | 23 | `GET /mm/materials`, `POST /mm/purchase-orders` |
-| SD | 15 | `GET /sd/sales-orders`, `POST /sd/deliveries` |
-| PP | 10 | `GET /pp/boms`, `POST /pp/production-orders` |
-| HR | 11 | `GET /hr/employees`, `POST /hr/payroll-runs` |
+| Auth | 14 | `POST /auth/login`, `POST /auth/refresh` |
+| FI | 19 | `GET /fi/accounts`, `POST /fi/journal-entries` |
+| CO | 9 | `GET /co/cost-centers`, `POST /co/allocations` |
+| MM | 24 | `GET /mm/materials`, `POST /mm/purchase-orders` |
+| SD | 13 | `GET /sd/sales-orders`, `POST /sd/deliveries` |
+| PP | 11 | `GET /pp/boms`, `POST /pp/production-orders` |
+| HR | 18 | `GET /hr/employees`, `POST /hr/payroll-runs` |
 | WM | 10 | `GET /wm/warehouses`, `POST /wm/transfers` |
 | QM | 9 | `GET /qm/inspection-lots`, `POST /qm/results` |
-| Lowcode | 67+ | `GET /lowcode/projects`, `POST /lowcode/forms/execute` |
-| **Total** | **160+** | |
+| Lowcode | 71 | `GET /lowcode/projects`, `POST /lowcode/forms/execute` |
+| Notifications | 5 | `GET /notifications`, `PUT /notifications/read` |
+| System | 55 | `GET /system/approvals/pending`, `POST /system/workflows` |
+| **Total** | **260+** | |
 
 See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for complete documentation.
+
+> Endpoint counts are based on HTTP handler registrations in route files (get/post/put/delete methods).
 
 ---
 
@@ -580,8 +587,8 @@ See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for complete documentation.
 
 | Document | Description |
 |----------|-------------|
-| [API Reference](docs/API_REFERENCE.md) | Complete REST API documentation (160+ endpoints) |
-| [Database Schema](docs/DATABASE_SCHEMA.md) | All 74 tables with relationships & indexes |
+| [API Reference](docs/API_REFERENCE.md) | Complete REST API documentation (260+ endpoints) |
+| [Database Schema](docs/DATABASE_SCHEMA.md) | All 123 tables with relationships & indexes |
 | [Technical Manual](docs/TECHNICAL_MANUAL.md) | Architecture, deployment & development guide |
 | [Workflow Guide](docs/WORKFLOW_GUIDE.md) | Business process flows & state machines |
 

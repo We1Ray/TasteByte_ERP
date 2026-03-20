@@ -1,6 +1,6 @@
 # TasteByte ERP - Technical Manual
 
-> Version 1.0 | Last Updated: 2026-02-21
+> Version 2.0 | Last Updated: 2026-03-21
 
 ## Table of Contents
 
@@ -11,8 +11,10 @@
 5. [ERP Module Overview](#5-erp-module-overview)
 6. [Cross-Module Integrations](#6-cross-module-integrations)
 7. [Low-Code Platform](#7-low-code-platform)
-8. [Development Guide](#8-development-guide)
-9. [Deployment](#9-deployment)
+8. [YAML Operations System](#8-yaml-operations-system)
+9. [Internationalization (i18n)](#9-internationalization-i18n)
+10. [Development Guide](#10-development-guide)
+11. [Deployment](#11-deployment)
 
 ---
 
@@ -20,35 +22,37 @@
 
 ```
                          ┌──────────────────────────────────┐
-                         │          Load Balancer           │
+                         │      Nginx Reverse Proxy         │
+                         │        (Port 80 / 443)           │
                          └──────────────┬───────────────────┘
                                         │
-              ┌─────────────────────────┼─────────────────────────┐
-              │                         │                         │
-    ┌─────────▼─────────┐   ┌──────────▼──────────┐   ┌─────────▼─────────┐
-    │   Next.js 15 Web  │   │   iOS App (Native)  │   │ Android App(Native│
-    │   Port: 3000      │   │   Swift / SwiftUI   │   │ Kotlin / Compose  │
-    │   App Router       │   │   MVVM Pattern      │   │ MVVM + Retrofit   │
-    └─────────┬─────────┘   └──────────┬──────────┘   └─────────┬─────────┘
-              │                         │                         │
-              └─────────────────────────┼─────────────────────────┘
-                                        │
-                              REST API (JSON)
-                                        │
-                         ┌──────────────▼───────────────────┐
-                         │     Rust / Axum 0.8 Backend     │
-                         │         Port: 8000               │
-                         │   JWT Auth + RBAC Middleware      │
-                         │   18 SQL Migrations (auto-run)   │
-                         └──────────────┬───────────────────┘
-                                        │
-                              SQLx 0.8 (async)
-                                        │
-                         ┌──────────────▼───────────────────┐
-                         │    PostgreSQL 17 (Local)         │
-                         │    Port: 5432 | DB: TastyByte    │
-                         │    74 Tables | 18 Migrations     │
-                         └──────────────────────────────────┘
+         ┌──────────────────┬───────────┼───────────┬──────────────────┐
+         │                  │           │           │                  │
+┌────────▼────────┐ ┌──────▼───────┐ ┌─▼──────────┐ ┌────────▼───────┐
+│  Next.js 16 Web │ │  iOS Native  │ │Android Natv│ │ Flutter Mobile │
+│  Port: 3000     │ │  SwiftUI     │ │ Compose    │ │ Cross-platform │
+│  App Router     │ │  MVVM        │ │ MVVM       │ │ Dart + Dio     │
+└────────┬────────┘ └──────┬───────┘ └─┬──────────┘ └────────┬───────┘
+         │                  │           │                      │
+         └──────────────────┼───────────┼──────────────────────┘
+                            │           │
+                   REST API (JSON) + JWT Auth
+                            │
+              ┌─────────────▼────────────────────┐
+              │     Rust / Axum 0.8 Backend      │
+              │         Port: 8000                │
+              │   RBAC + Rate Limiting + Metrics  │
+              │   44 SQL Migrations (auto-run)    │
+              │   YAML Operation Sync on Startup  │
+              └─────────────┬────────────────────┘
+                            │
+                  SQLx 0.8 (compile-time checked)
+                            │
+              ┌─────────────▼────────────────────┐
+              │    PostgreSQL 17 (Local)          │
+              │    Port: 5432 | DB: TastyByte     │
+              │    123 Tables | 44 Migrations     │
+              └──────────────────────────────────┘
 ```
 
 ### Design Principles
@@ -57,7 +61,9 @@
 - **Document Flow**: Auto-generated document numbers (`SO00000001`, `PO00000001`)
 - **Status Machine**: Validated state transitions with audit trail
 - **Single Backend**: All business logic in one Rust binary
-- **Native Mobile**: iOS (Swift) + Android (Kotlin), NOT cross-platform
+- **Multi-Platform Mobile**: Native iOS (Swift) + Native Android (Kotlin) + Flutter cross-platform
+- **YAML-Driven Low-Code**: File-based operation definitions synced on startup
+- **i18n**: English + Traditional Chinese (next-intl)
 
 ---
 
@@ -66,19 +72,25 @@
 | Layer | Technology | Version | Purpose |
 |-------|-----------|---------|---------|
 | Backend | Rust + Axum | 0.8 | API server, business logic |
-| ORM | SQLx | 0.8 | Async PostgreSQL driver |
-| Database | PostgreSQL | 17 | Primary data store |
-| Web Frontend | Next.js | 15 | ERP management UI |
+| ORM | SQLx | 0.8 | Compile-time checked async PostgreSQL driver |
+| Database | PostgreSQL | 17 | Primary data store (123 tables) |
+| Web Frontend | Next.js | 16.x | ERP management UI (App Router) |
+| React | React | 19.x | UI framework |
 | CSS | Tailwind CSS | 4.x | Utility-first styling |
 | State (Server) | TanStack Query | 5.x | API cache & mutations |
-| State (Client) | Zustand | 5.x | Auth, UI, form builder state |
+| State (Client) | Zustand | 5.x | Auth, UI, form builder, locale state |
 | Tables | TanStack Table | 8.x | Data grid rendering |
 | Validation | Zod | 3.x | Form validation |
+| i18n | next-intl | 4.x | English + Traditional Chinese |
 | Notifications | Sonner | 2.x | Toast notifications |
+| Charts | Recharts | — | Data visualization |
 | iOS | Swift / SwiftUI | 6.0 | Native iOS app |
 | Android | Kotlin / Jetpack Compose | 1.9 | Native Android app |
-| Auth | JWT + Argon2 | — | Token auth + password hashing |
+| Mobile | Flutter / Dart | 3.x | Cross-platform mobile app |
+| Auth | JWT + Argon2 | — | Token auth + password hashing + refresh tokens |
 | HTTP Client | Axios | 1.x | Frontend API calls |
+| Reverse Proxy | Nginx | 1.27 | Load balancing, SSL termination |
+| Container | Docker Compose | — | Full stack orchestration (4 services) |
 
 ---
 
@@ -86,12 +98,12 @@
 
 ```
 TasteByte_ERP/
-├── backend/                          # Rust/Axum Backend
-│   ├── Cargo.toml                    # Dependencies
+├── backend/                          # Rust/Axum Backend (260+ endpoints)
+│   ├── Cargo.toml                    # Dependencies (Rust 2021 edition)
 │   ├── .env                          # DATABASE_URL config
-│   ├── migrations/                   # 18 SQL migration files
+│   ├── migrations/                   # 44 SQL migration files
 │   │   ├── 001_foundation.sql        # Users, roles, audit_log
-│   │   ├── 002_fi_accounts.sql       # FI chart of accounts
+│   │   ├── 002_fi_chart_of_accounts.sql # FI chart of accounts
 │   │   ├── 003_fi_journal.sql        # FI journal entries
 │   │   ├── 004_mm_materials.sql      # MM materials, vendors
 │   │   ├── 005_mm_inventory.sql      # MM POs, stock, movements
@@ -102,24 +114,51 @@ TasteByte_ERP/
 │   │   ├── 010_qm_quality.sql        # QM inspections
 │   │   ├── 011_co_controlling.sql    # CO cost centers
 │   │   ├── 012_seed_data.sql         # Initial data
-│   │   ├── 013_reporting_views.sql   # FI/SD/MM report views
-│   │   ├── 014_lowcode_core.sql      # LC projects, operations, forms
+│   │   ├── 013_rbac_permissions.sql  # RBAC permissions
+│   │   ├── 014_lowcode_platform.sql  # LC projects, operations, forms
 │   │   ├── 015_lowcode_permissions.sql # LC RBAC
 │   │   ├── 016_lowcode_workflow.sql  # LC releases, feedback, journal
-│   │   ├── 017_lowcode_navigation.sql # LC navigation
-│   │   └── 018_workflow_infrastructure.sql # Status history, CHECK constraints
+│   │   ├── 017_lowcode_seed.sql      # LC seed data
+│   │   ├── 018_workflow_infrastructure.sql # Status history, CHECK constraints
+│   │   ├── 019-028                   # Phase 1 extensions, hierarchical RBAC,
+│   │   │                             #   account lockout, refresh tokens, indexes
+│   │   ├── 029_notifications.sql     # In-app notification system
+│   │   ├── 030_cross_module_integration.sql # Cross-module linking
+│   │   ├── 031_module_linked_operations.sql # LC-ERP module linking
+│   │   ├── 032-034                   # Demo/seed data, backend fixes
+│   │   ├── 035_infrastructure.sql    # Email, webhooks, scheduled jobs
+│   │   ├── 036_q1q2_features.sql     # Approvals, BPM workflows, reports
+│   │   ├── 037_q3q4_features.sql     # Print, analytics, exchange rates
+│   │   ├── 038_business_operations_via_lowcode.sql # LC business ops
+│   │   ├── 039_lowcode_improvements.sql # Form variants, cross-field rules
+│   │   ├── 040_supply_chain_core.sql # Supply chain extensions
+│   │   ├── 041_test_seed_data.sql    # Test seed data
+│   │   ├── 042_yaml_sync_support.sql # YAML sync metadata columns
+│   │   ├── 043_100_operations_bulk.sql # Bulk operation seed data
+│   │   └── 044_form_improvements.sql # Form UI improvements
+│   ├── operations/                   # YAML operation definitions (file-driven)
+│   │   ├── hr/hr-leave.yaml          # Leave request form
+│   │   ├── mm/mm-eval.yaml           # Supplier evaluation form
+│   │   ├── mm/mm-grn.yaml            # Goods receipt note form
+│   │   ├── pp/pp-consume.yaml        # Material consumption form
+│   │   ├── qm/qm-insp.yaml          # Quality inspection form
+│   │   ├── sd/sd-delivery.yaml       # Delivery note form
+│   │   └── wm/wm-move.yaml          # Warehouse movement form
+│   ├── tests/                        # Integration tests (10 modules)
 │   └── src/
-│       ├── main.rs                   # Entry point, server startup
-│       ├── routes.rs                 # Top-level router
-│       ├── auth/                     # Authentication module
-│       │   ├── handlers.rs           # Login, register, refresh
-│       │   ├── middleware.rs         # JWT extraction middleware
+│       ├── main.rs                   # Entry point, server startup + YAML sync
+│       ├── routes.rs                 # Top-level router (build_router)
+│       ├── config/                   # Settings, create_pool()
+│       ├── auth/                     # Authentication module (14 endpoints)
+│       │   ├── handlers.rs           # Login, register, refresh, lockout
+│       │   ├── middleware.rs          # JWT extraction middleware
 │       │   ├── models.rs             # Claims, LoginRequest
 │       │   ├── rbac.rs               # RequireRole<R> extractor
 │       │   ├── routes.rs             # /auth routes
 │       │   └── services.rs           # Password hashing, token generation
 │       ├── shared/                   # Shared infrastructure
 │       │   ├── mod.rs                # Module exports
+│       │   ├── admin_api.rs          # System admin endpoints (55 handlers)
 │       │   ├── audit.rs              # log_change() for audit trail
 │       │   ├── error.rs              # AppError enum
 │       │   ├── handlers.rs           # StatusHistory query handler
@@ -127,48 +166,68 @@ TasteByte_ERP/
 │       │   ├── response.rs           # ApiResponse<T> wrapper
 │       │   ├── status.rs             # DocumentType, validate_transition()
 │       │   ├── status_history.rs     # record_transition()
-│       │   └── types.rs              # AppState
-│       ├── fi/                       # Financial Accounting (23 endpoints)
-│       ├── co/                       # Controlling (12 endpoints)
-│       ├── mm/                       # Materials Management (23 endpoints)
-│       ├── sd/                       # Sales & Distribution (15 endpoints)
-│       ├── pp/                       # Production Planning (10 endpoints)
-│       ├── hr/                       # Human Resources (11 endpoints)
+│       │   └── types.rs              # AppState (pool + metrics_handle)
+│       ├── fi/                       # Financial Accounting (19 endpoints)
+│       ├── co/                       # Controlling (9 endpoints)
+│       ├── mm/                       # Materials Management (24 endpoints)
+│       ├── sd/                       # Sales & Distribution (13 endpoints)
+│       ├── pp/                       # Production Planning (11 endpoints)
+│       ├── hr/                       # Human Resources (18 endpoints)
 │       ├── wm/                       # Warehouse Management (10 endpoints)
 │       ├── qm/                       # Quality Management (9 endpoints)
-│       ├── lowcode/                  # Low-Code Platform (67 endpoints)
+│       ├── lowcode/                  # Low-Code Platform (71 endpoints)
+│       │   ├── handlers/             # HTTP handlers
+│       │   ├── services/             # Business logic
+│       │   ├── models.rs             # Data models
+│       │   ├── routes.rs             # Route definitions
+│       │   └── yaml_sync/            # YAML operation sync engine
+│       │       ├── loader.rs         # Load YAML files from disk
+│       │       ├── syncer.rs         # Upsert into database
+│       │       ├── exporter.rs       # Export operations to YAML
+│       │       └── schema.rs         # YAML schema definitions
+│       ├── notifications/            # Notification system (5 endpoints)
+│       │   ├── handlers.rs           # CRUD + mark-read
+│       │   ├── models.rs             # Notification model
+│       │   ├── routes.rs             # /notifications routes
+│       │   └── services.rs           # Notification logic
+│       ├── middleware/                # CORS, logging, metrics, rate limiting
 │       └── schema/                   # Migration engine
 │           └── migrator.rs           # Auto-migration on startup
 │
-├── web/                              # Next.js 15 Frontend
+├── web/                              # Next.js 16 Frontend
 │   ├── package.json                  # Dependencies
 │   ├── next.config.ts                # Next.js config
-│   ├── tailwind.config.ts            # Tailwind config
+│   ├── messages/                     # i18n translation files
+│   │   ├── en.json                   # English
+│   │   └── zh-TW.json               # Traditional Chinese
 │   └── src/
 │       ├── app/                      # App Router pages
-│       │   ├── layout.tsx            # Root layout
+│       │   ├── layout.tsx            # Root layout (i18n provider)
 │       │   ├── login/page.tsx        # Login page
-│       │   ├── (erp)/               # ERP module pages
-│       │   │   ├── layout.tsx        # ERP shell (sidebar + header)
-│       │   │   ├── dashboard/        # Main dashboard
-│       │   │   ├── fi/               # FI pages (7 routes)
-│       │   │   ├── co/               # CO pages (5 routes)
-│       │   │   ├── mm/               # MM pages (8 routes)
-│       │   │   ├── sd/               # SD pages (6 routes)
-│       │   │   ├── pp/               # PP pages (4 routes)
-│       │   │   ├── hr/               # HR pages (3 routes)
-│       │   │   ├── wm/               # WM pages (4 routes)
-│       │   │   └── qm/               # QM pages (3 routes)
-│       │   ├── admin/                # LC Admin pages
-│       │   ├── developer/            # LC Developer pages
-│       │   └── lowcode/              # LC User runtime pages
+│       │   └── (erp)/               # ERP module pages
+│       │       ├── layout.tsx        # ERP shell (sidebar + header)
+│       │       ├── dashboard/        # Main dashboard
+│       │       ├── fi/               # FI pages
+│       │       ├── co/               # CO pages
+│       │       ├── mm/               # MM pages
+│       │       ├── sd/               # SD pages
+│       │       ├── pp/               # PP pages
+│       │       ├── hr/               # HR pages
+│       │       ├── wm/               # WM pages
+│       │       ├── qm/               # QM pages
+│       │       ├── notifications/    # Notification center
+│       │       ├── admin/            # LC Admin pages (users, roles, projects...)
+│       │       ├── developer/        # LC Developer pages (operations, feedback)
+│       │       └── lowcode/          # LC User runtime pages
 │       ├── components/
 │       │   ├── layout/               # Sidebar, Header, PageHeader
 │       │   ├── ui/                   # Button, Card, Input, Badge, Modal, Table
 │       │   ├── shared/               # StatusBadge, WorkflowTimeline
-│       │   └── lowcode/              # 27 form builder components
+│       │   ├── charts/               # Recharts wrappers
+│       │   ├── forms/                # Form components
+│       │   └── lowcode/              # Form builder components
 │       └── lib/
-│           ├── api/                  # 12 API client modules
+│           ├── api/                  # 16 API client modules
 │           │   ├── client.ts         # Axios instance + interceptors
 │           │   ├── auth.ts           # Auth API
 │           │   ├── fi.ts             # FI API
@@ -179,39 +238,61 @@ TasteByte_ERP/
 │           │   ├── hr.ts             # HR API
 │           │   ├── wm.ts             # WM API
 │           │   ├── qm.ts             # QM API
-│           │   ├── lowcode.ts        # LC API (14 sub-modules)
+│           │   ├── lowcode.ts        # LC API
+│           │   ├── notifications.ts  # Notification API
+│           │   ├── rbac.ts           # RBAC API
+│           │   ├── system.ts         # System/admin API
+│           │   ├── ai-chat.ts        # AI chat API
 │           │   └── dashboard.ts      # Dashboard KPI API
-│           ├── hooks/                # 7 custom hooks
+│           ├── hooks/                # 8 custom hooks
 │           │   ├── use-auth.ts       # Auth flow
 │           │   ├── use-api-query.ts  # React Query wrappers
 │           │   ├── use-pagination.ts # Pagination state
 │           │   ├── use-toast-mutation.ts # Toast-enabled mutations
 │           │   ├── use-dynamic-form.ts   # Form builder hooks
+│           │   ├── use-form-calculations.ts # Formula evaluation
 │           │   ├── use-lookup.ts     # Dropdown/lookup hooks
 │           │   └── use-platform-role.ts  # Platform role checks
-│           ├── stores/               # 3 Zustand stores
+│           ├── stores/               # 7 Zustand stores
 │           │   ├── auth-store.ts     # Auth state
 │           │   ├── ui-store.ts       # Layout state
-│           │   └── builder-store.ts  # Form builder state
-│           └── utils.ts              # formatCurrency, formatDate, etc.
+│           │   ├── builder-store.ts  # Form builder state
+│           │   ├── list-builder-store.ts  # List builder state
+│           │   ├── dashboard-builder-store.ts # Dashboard builder state
+│           │   ├── locale-store.ts   # i18n locale state
+│           │   └── ai-chat-store.ts  # AI chat state
+│           ├── types/                # TypeScript type definitions
+│           └── utils/                # formatCurrency, formatDate, etc.
 │
-├── ios/                              # iOS Native App (57 files)
+├── mobile/                           # Flutter Cross-Platform App
+│   ├── pubspec.yaml                  # Dart dependencies
+│   ├── lib/                          # Dart source code
+│   ├── ios/                          # iOS platform config
+│   ├── android/                      # Android platform config
+│   └── test/                         # Flutter tests
+│
+├── ios/                              # Native iOS App (Swift/SwiftUI)
 │   └── TasteByte/
 │       ├── Models/                   # API response models
 │       ├── Services/                 # APIClient, AuthService
 │       ├── ViewModels/               # MVVM view models
 │       └── Views/                    # SwiftUI screens (8 modules)
 │
-├── android/                          # Android Native App (56 files)
+├── android/                          # Native Android App (Kotlin/Compose)
 │   └── app/src/main/
 │       ├── data/                     # Repository, API service
 │       ├── ui/                       # Compose screens (8 modules)
 │       └── viewmodel/                # MVVM view models
 │
+├── nginx/                            # Reverse proxy configuration
+├── scripts/                          # Backup/restore utilities
+├── docker-compose.yml                # Full stack orchestration (4 services)
+├── Makefile                          # Development commands
+│
 └── docs/                             # Documentation
     ├── TECHNICAL_MANUAL.md           # This file
     ├── API_REFERENCE.md              # Complete API endpoint reference
-    ├── DATABASE_SCHEMA.md            # All 74 tables
+    ├── DATABASE_SCHEMA.md            # All 123 tables
     └── WORKFLOW_GUIDE.md             # Status machines & workflow
 ```
 
@@ -289,16 +370,19 @@ Three-tier platform roles (separate from ERP roles):
 
 | Module | Code | Tables | Endpoints | Description |
 |--------|------|--------|-----------|-------------|
-| Financial Accounting | FI | 9 | 23 | Chart of accounts, journals, AR/AP, reports |
-| Controlling | CO | 4 | 12 | Cost centers, profit centers, internal orders |
-| Materials Management | MM | 6 | 23 | Materials, vendors, POs, goods receipt |
-| Sales & Distribution | SD | 5 | 15 | Customers, sales orders, deliveries, invoices |
-| Production Planning | PP | 5 | 10 | BOMs, routings, production orders |
-| Human Resources | HR | 4 | 11 | Departments, employees, attendance |
-| Warehouse Management | WM | 6 | 10 | Warehouses, storage bins, transfers, counts |
-| Quality Management | QM | 3 | 9 | Inspection lots, results, notifications |
-| Low-Code Platform | LC | 24 | 67 | Projects, forms, permissions, releases |
-| **Total** | | **74** | **183** | |
+| Financial Accounting | FI | 10 | 19 | Chart of accounts, journals, AR/AP, payments, reports |
+| Controlling | CO | 4 | 9 | Cost centers, profit centers, internal orders, allocations |
+| Materials Management | MM | 12 | 24 | Materials, vendors, POs, goods receipt, stock, movements |
+| Sales & Distribution | SD | 5 | 13 | Customers, sales orders, deliveries, invoices |
+| Production Planning | PP | 5 | 11 | BOMs, routings, production orders |
+| Human Resources | HR | 6 | 18 | Departments, employees, attendance, payroll, salary |
+| Warehouse Management | WM | 5 | 10 | Warehouses, storage bins, transfers, stock counts |
+| Quality Management | QM | 3 | 9 | Inspection lots, results, quality notifications |
+| Auth | — | 5 | 14 | Login, register, refresh, lockout, roles |
+| Low-Code Platform | LC | 24+ | 71 | Projects, forms, permissions, releases, YAML sync |
+| Notifications | — | 2 | 5 | In-app notifications, read/unread tracking |
+| System/Admin | — | 20+ | 55 | Approvals, BPM, email, webhooks, jobs, analytics |
+| **Total** | | **123** | **260+** | |
 
 ### 5.2 Document Number Ranges
 
@@ -417,20 +501,180 @@ DRAFT ──► SUBMITTED ──► APPROVED ──► RELEASED
                     └──► REJECTED
 ```
 
+### 7.5 Cross-Field Rules & Formulas
+
+Operations support declarative validation and calculation rules:
+
+- **Cross-Field Validation**: Rules that validate one field against another (e.g., received_qty <= ordered_qty * 1.1)
+- **Calculation Formulas**: Auto-computed fields based on other field values
+- **Output Determination**: Automatic notifications or actions triggered by field values on create/update
+
+### 7.6 Form Variants
+
+Operations can have multiple form variants (different field layouts/defaults) selected at runtime based on user role or context.
+
 ---
 
-## 8. Development Guide
+## 8. YAML Operations System
 
-### 8.1 Prerequisites
+### 8.1 Overview
 
-- Rust 1.75+ (rustup)
-- Node.js 20+ (for Next.js)
+The YAML operations system provides a file-driven approach to defining low-code operations. YAML files stored in `backend/operations/` are automatically synced to the database on server startup, enabling version-controlled operation definitions.
+
+### 8.2 Directory Structure
+
+```
+backend/operations/
+├── hr/
+│   └── hr-leave.yaml          # Leave request form
+├── mm/
+│   ├── mm-eval.yaml           # Supplier evaluation form
+│   └── mm-grn.yaml            # Goods receipt note form
+├── pp/
+│   └── pp-consume.yaml        # Material consumption form
+├── qm/
+│   └── qm-insp.yaml          # Quality inspection form
+├── sd/
+│   └── sd-delivery.yaml       # Delivery note form
+└── wm/
+    └── wm-move.yaml           # Warehouse movement form
+```
+
+### 8.3 YAML Schema
+
+Each YAML operation file defines a complete operation including form layout, fields, validation rules, and output actions:
+
+```yaml
+operation_code: MM-GRN
+name: "Goods Receipt Note (GRN)"
+description: "Purchase receipt confirmation with auto inventory update"
+module: MM
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: PackageCheck
+  sort_order: 30
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "GRN Information"
+      columns: 2
+      fields:
+        - field_name: grn_number
+          label: "GRN Number"
+          type: TEXT
+          required: true
+          searchable: true
+          config:
+            is_readonly: true
+          default_value_sql: "SELECT ..."  # Auto-generated number
+
+        - field_name: status
+          label: "Status"
+          type: DROPDOWN
+          options:
+            - label: "Draft"
+              value: DRAFT
+              is_default: true
+
+cross_field_rules:
+  - name: "Received quantity limit"
+    rule_type: VALIDATION
+    source_field: received_qty
+    operator: lte
+    error_message: "Received quantity exceeds order limit"
+
+output_rules:
+  - name: "Notify finance on confirmation"
+    trigger_event: ON_CREATE
+    condition_field: status
+    condition_operator: equals
+    condition_value: CONFIRMED
+    output_type: NOTIFICATION
+```
+
+### 8.4 Sync Engine
+
+The YAML sync engine (`backend/src/lowcode/yaml_sync/`) handles:
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Loader | `loader.rs` | Reads and parses YAML files from `backend/operations/` |
+| Syncer | `syncer.rs` | Upserts operations, fields, rules, and outputs into the database |
+| Exporter | `exporter.rs` | Exports database operations back to YAML format |
+| Schema | `schema.rs` | Rust structs matching the YAML schema |
+
+**Sync behavior:**
+- Runs automatically on server startup
+- Uses `operation_code` as the unique key for upsert
+- Preserves user-created operations (only syncs YAML-sourced ones)
+- Tracks sync metadata via `042_yaml_sync_support.sql` migration columns
+
+### 8.5 Adding a New YAML Operation
+
+1. Create a YAML file in `backend/operations/{module}/`:
+   ```bash
+   backend/operations/mm/mm-new-form.yaml
+   ```
+
+2. Define the operation following the schema in section 8.3
+
+3. Restart the backend server -- the sync engine picks up the file automatically
+
+4. The operation appears in the low-code platform and (if `sidebar` is defined) in the ERP module sidebar
+
+---
+
+## 9. Internationalization (i18n)
+
+### 9.1 Overview
+
+The web frontend supports English and Traditional Chinese using `next-intl`.
+
+### 9.2 Translation Files
+
+```
+web/messages/
+├── en.json      # English (default)
+└── zh-TW.json   # Traditional Chinese
+```
+
+### 9.3 Locale State
+
+Locale selection is managed by the `locale-store.ts` Zustand store and persisted across sessions.
+
+### 9.4 Usage in Components
+
+```tsx
+import { useTranslations } from 'next-intl';
+
+function MyComponent() {
+  const t = useTranslations('module.section');
+  return <h1>{t('title')}</h1>;
+}
+```
+
+---
+
+## 10. Development Guide
+
+### 10.1 Prerequisites
+
+- Rust 1.75+ (rustup, 2021 edition)
+- Node.js 20+ (for Next.js 16)
 - pnpm 9+ (package manager)
-- PostgreSQL 17 (Homebrew)
+- PostgreSQL 17 (Homebrew or Docker)
 - Xcode 16+ (iOS development)
 - Android Studio (Android development)
+- Flutter SDK 3.x+ (cross-platform mobile development)
+- Docker & Docker Compose (optional, for containerized setup)
 
-### 8.2 Local Setup
+### 10.2 Local Setup
 
 ```bash
 # 1. Database
@@ -440,7 +684,7 @@ PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE \"
 cd backend
 cp .env.example .env  # DATABASE_URL=postgres://postgres:postgres@localhost:5432/TastyByte
 cargo build
-cargo run             # Auto-runs all 18 migrations on startup
+cargo run             # Auto-runs all 44 migrations + YAML sync on startup
 
 # 3. Web Frontend
 cd web
@@ -452,7 +696,7 @@ pnpm dev              # http://localhost:3000
 # Password: admin123
 ```
 
-### 8.3 Adding a New API Endpoint
+### 10.3 Adding a New API Endpoint
 
 1. **Model** (`module/models.rs`): Define request/response structs
 2. **Repository** (`module/repositories.rs`): Write SQL queries
@@ -462,27 +706,37 @@ pnpm dev              # http://localhost:3000
 6. **Frontend API** (`web/src/lib/api/module.ts`): Add API function
 7. **Frontend Page**: Create/update page component
 
-### 8.4 Adding a New Migration
+### 10.4 Adding a New Migration
 
 ```bash
-# Create file: backend/migrations/019_your_feature.sql
+# Create file: backend/migrations/045_your_feature.sql
 # Backend auto-runs on startup
 # Use sqlx::raw_sql() for multi-statement migrations
+# Current migration count: 44 (001-044)
 ```
 
-### 8.5 Key Commands
+### 10.5 Key Commands
 
 | Command | Purpose |
 |---------|---------|
+| `make dev` | Start all services (backend + web) |
+| `make build` | Build all (backend + web) |
+| `make test` | Run all tests (backend + web) |
+| `make lint` | Run linters (clippy + eslint) |
+| `make docker-up` | Build and start Docker containers |
+| `make docker-down` | Stop Docker containers |
+| `make db-backup` | Backup database |
+| `make db-restore` | Restore database from backup |
 | `cd backend && cargo build` | Compile backend |
-| `cd backend && cargo test` | Run 41 tests |
+| `cd backend && cargo test --lib` | Run 160 unit tests |
 | `cd backend && cargo clippy` | Lint Rust code |
 | `cd backend && cargo fmt` | Format Rust code |
 | `pnpm --prefix web build` | Build web frontend |
-| `pnpm --prefix web dev` | Dev server |
+| `pnpm --prefix web dev` | Dev server (http://localhost:3000) |
+| `pnpm --prefix web test` | Run 96 Vitest unit tests |
 | `pnpm --prefix web lint` | ESLint check |
 
-### 8.6 API Response Format
+### 10.6 API Response Format
 
 All endpoints return:
 ```json
@@ -517,9 +771,34 @@ Paginated response:
 
 ---
 
-## 9. Deployment
+## 11. Deployment
 
-### 9.1 Backend
+### 11.1 Docker Compose (Recommended)
+
+```bash
+# Copy environment file
+cp .env.docker.example .env
+
+# Start all 4 services (postgres, backend, web, nginx)
+docker compose up -d
+
+# Access:
+# Web:  http://localhost (via nginx)
+# API:  http://localhost:8000 (direct)
+# DB:   localhost:5432
+```
+
+**Services:**
+| Service | Image | Port | Purpose |
+|---------|-------|------|---------|
+| postgres | postgres:17-alpine | 5432 | Database |
+| backend | Custom (Rust) | 8000 | API server |
+| web | Custom (Next.js) | 3000 | Web frontend |
+| nginx | nginx:1.27-alpine | 80/443 | Reverse proxy |
+
+Optional monitoring (uncomment in docker-compose.yml): Prometheus + Grafana
+
+### 11.2 Backend
 
 ```bash
 cd backend
@@ -528,7 +807,7 @@ cargo build --release
 # Requires: DATABASE_URL, JWT_SECRET environment variables
 ```
 
-### 9.2 Web Frontend
+### 11.3 Web Frontend
 
 ```bash
 cd web
@@ -538,7 +817,7 @@ pnpm start
 # Requires: NEXT_PUBLIC_API_URL environment variable
 ```
 
-### 9.3 Environment Variables
+### 11.4 Environment Variables
 
 **Backend** (`backend/.env`):
 | Variable | Required | Default | Description |

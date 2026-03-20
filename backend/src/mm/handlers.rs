@@ -377,7 +377,7 @@ pub async fn delete_material(
 
     // Check for active BOM items
     let (bom_count,): (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM pp_bom_items WHERE material_id = $1")
+        sqlx::query_as("SELECT COUNT(*) FROM pp_bom_items WHERE component_material_id = $1")
             .bind(id)
             .fetch_one(&state.pool)
             .await?;

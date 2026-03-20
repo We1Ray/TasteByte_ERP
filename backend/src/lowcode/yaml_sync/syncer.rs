@@ -111,6 +111,13 @@ async fn sync_operation(pool: &PgPool, op: &OperationDef) -> Result<(), String> 
     .await
     .map_err(|e| e.to_string())?;
 
+    // Fetch the actual operation ID (may differ from det_uuid if the row pre-existed)
+    let op_id: Uuid = sqlx::query_scalar("SELECT id FROM lc_operations WHERE operation_code = $1")
+        .bind(&op.operation_code)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
     // Sync form
     if let Some(ref form) = op.form {
         sync_form(&mut tx, op_id, &op.operation_code, form).await?;
@@ -165,6 +172,22 @@ async fn sync_form(
     .execute(&mut **tx)
     .await
     .map_err(|e| e.to_string())?;
+
+    // Fetch actual form_id (may differ from det_uuid if form pre-existed)
+    let form_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM lc_form_definitions WHERE operation_id = $1")
+            .bind(op_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(|e| e.to_string())?;
+
+    // Delete existing sections (CASCADE deletes field_definitions and field_options too)
+    // so we can re-create them cleanly with deterministic UUIDs
+    sqlx::query("DELETE FROM lc_form_sections WHERE form_id = $1")
+        .bind(form_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut section_ids = Vec::new();
     for (sidx, section) in form.sections.iter().enumerate() {

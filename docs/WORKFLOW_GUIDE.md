@@ -1,6 +1,6 @@
 # TasteByte ERP - Workflow & Status Management Guide
 
-> Last Updated: 2026-02-21
+> Last Updated: 2026-03-21
 
 ## Table of Contents
 
@@ -11,6 +11,9 @@
 5. [Frontend Workflow Components](#5-frontend-workflow-components)
 6. [DB Constraints & Data Integrity](#6-db-constraints--data-integrity)
 7. [Extending Workflows](#7-extending-workflows)
+8. [YAML-Based Operation Workflows](#8-yaml-based-operation-workflows)
+9. [BPM Workflow Engine](#9-bpm-workflow-engine)
+10. [Approval Matrix](#10-approval-matrix)
 
 ---
 
@@ -607,3 +610,153 @@ status_history::record_transition(
 ```
 
 The reason appears in the WorkflowTimeline component as italic text below the transition.
+
+---
+
+## 8. YAML-Based Operation Workflows
+
+### 8.1 Overview
+
+The YAML operations system (`backend/operations/`) enables file-driven workflow definitions that are synced to the database on server startup. This allows developers to define complete business operations -- including forms, validation rules, and automated actions -- in version-controlled YAML files.
+
+### 8.2 Operation Lifecycle
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│              YAML Operation Lifecycle                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. Developer creates YAML file in backend/operations/       │
+│     └──► mm/mm-grn.yaml                                     │
+│                                                              │
+│  2. Server startup triggers yaml_sync                        │
+│     └──► loader.rs reads all .yaml files                    │
+│     └──► syncer.rs upserts into lc_operations + fields      │
+│                                                              │
+│  3. Operation appears in Low-Code platform                   │
+│     └──► If sidebar config present, appears in ERP module   │
+│                                                              │
+│  4. End users execute the operation                          │
+│     └──► Data stored in lc_operation_data (JSONB)           │
+│     └──► Cross-field rules validated on save                │
+│     └──► Output rules trigger notifications/actions         │
+│                                                              │
+│  5. Developer updates YAML → restart → auto-sync            │
+│     └──► Existing data preserved, schema updated            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 Cross-Field Rules in YAML
+
+YAML operations support declarative validation rules that execute on form submission:
+
+```yaml
+cross_field_rules:
+  - name: "Received quantity limit"
+    description: "Received qty must not exceed ordered qty by more than 10%"
+    rule_type: VALIDATION
+    source_field: received_qty
+    operator: lte
+    target_field: ordered_qty   # Optional: compare against another field
+    error_message: "Received quantity exceeds order limit"
+```
+
+**Rule types:**
+| Type | Purpose |
+|------|---------|
+| `VALIDATION` | Block save if condition fails |
+| `VISIBILITY` | Show/hide fields based on conditions |
+| `CALCULATION` | Auto-compute field values |
+
+### 8.4 Output Determination in YAML
+
+Automated actions triggered by field values during create or update:
+
+```yaml
+output_rules:
+  - name: "Notify finance on confirmation"
+    trigger_event: ON_CREATE         # ON_CREATE | ON_UPDATE
+    condition_field: status
+    condition_operator: equals
+    condition_value: CONFIRMED
+    output_type: NOTIFICATION        # NOTIFICATION | EMAIL | WEBHOOK
+    recipient_type: STATIC           # STATIC | FIELD | ROLE
+    recipient_value: "user-uuid"
+```
+
+### 8.5 Available YAML Operations
+
+| File | Module | Operation | Description |
+|------|--------|-----------|-------------|
+| `hr/hr-leave.yaml` | HR | Leave Request | Employee leave application form |
+| `mm/mm-eval.yaml` | MM | Supplier Evaluation | Vendor performance assessment |
+| `mm/mm-grn.yaml` | MM | Goods Receipt Note | Purchase receipt with inventory update |
+| `pp/pp-consume.yaml` | PP | Material Consumption | Record material usage in production |
+| `qm/qm-insp.yaml` | QM | Quality Inspection | Inspection checklist with pass/fail |
+| `sd/sd-delivery.yaml` | SD | Delivery Note | Outbound delivery documentation |
+| `wm/wm-move.yaml` | WM | Warehouse Movement | Inter-location stock transfer |
+
+---
+
+## 9. BPM Workflow Engine
+
+### 9.1 Overview
+
+The system includes a BPM (Business Process Management) workflow engine managed via the `/api/v1/system/workflows` endpoints. Workflows define multi-step processes with conditional routing.
+
+### 9.2 Workflow Lifecycle
+
+```
+┌───────────┐     ┌────────────┐     ┌────────────┐     ┌───────────┐
+│  Define   │────►│   Start    │────►│  Advance   │────►│ Complete  │
+│ Workflow  │     │  Instance  │     │   Steps    │     │           │
+└───────────┘     └────────────┘     └────────────┘     └───────────┘
+```
+
+### 9.3 API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/system/workflows` | List workflow definitions |
+| POST | `/api/v1/system/workflows` | Create workflow definition |
+| PUT | `/api/v1/system/workflows/{id}` | Update workflow definition |
+| DELETE | `/api/v1/system/workflows/{id}` | Delete workflow definition |
+| POST | `/api/v1/system/workflows/{id}/start` | Start a workflow instance |
+| POST | `/api/v1/system/workflows/instances/{id}/advance` | Advance to next step |
+| GET | `/api/v1/system/workflows/instances` | List running instances |
+| GET | `/api/v1/system/workflows/instances/{id}/logs` | Get execution logs |
+
+---
+
+## 10. Approval Matrix
+
+### 10.1 Overview
+
+The approval matrix system provides configurable approval flows for business documents. Approval levels, delegates, and automatic routing are supported.
+
+### 10.2 Approval Flow
+
+```
+┌──────────┐     ┌───────────┐     ┌───────────┐     ┌──────────┐
+│  Submit  │────►│  Level 1  │────►│  Level 2  │────►│ Approved │
+│          │     │  Approver │     │  Approver │     │          │
+└──────────┘     └─────┬─────┘     └─────┬─────┘     └──────────┘
+                       │                 │
+                       ▼                 ▼
+                 ┌───────────┐     ┌───────────┐
+                 │ Rejected  │     │ Rejected  │
+                 └───────────┘     └───────────┘
+```
+
+### 10.3 API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/system/approvals/matrices` | List approval matrices |
+| POST | `/api/v1/system/approvals/matrices` | Create approval matrix |
+| GET | `/api/v1/system/approvals/matrices/{id}` | Get matrix details |
+| DELETE | `/api/v1/system/approvals/matrices/{id}` | Delete matrix |
+| POST | `/api/v1/system/approvals/submit` | Submit document for approval |
+| POST | `/api/v1/system/approvals/instances/{id}/action` | Approve/reject |
+| GET | `/api/v1/system/approvals/instances/{id}` | Get approval instance |
+| GET | `/api/v1/system/approvals/pending` | List pending approvals |
