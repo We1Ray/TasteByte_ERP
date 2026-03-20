@@ -265,10 +265,18 @@ async fn sync_form(
                 .data_source
                 .as_ref()
                 .and_then(|d| d.value_column.as_deref());
-            let config = field
+            let mut config = field
                 .config
                 .clone()
                 .unwrap_or(serde_json::json!({}));
+
+            // Merge sub_table_columns into field_config as detailColumns
+            // so the frontend can read field_config.detailColumns directly
+            if let Some(ref stc) = field.sub_table_columns {
+                if let Some(obj) = config.as_object_mut() {
+                    obj.insert("detailColumns".to_string(), stc.clone());
+                }
+            }
 
             sqlx::query(
                 "INSERT INTO lc_field_definitions \

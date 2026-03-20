@@ -91,6 +91,19 @@ pub async fn validate_for_create(
             continue;
         }
 
+        // Master-detail row-level validation
+        if field.field_type == "master_detail" || field.field_type == "MASTER_DETAIL" {
+            let md_errors = validate_master_detail_rows(
+                field_name,
+                field_label,
+                val,
+                field,
+                field.is_required,
+            );
+            errors.extend(md_errors);
+            continue;
+        }
+
         // String validations
         if let Value::String(s) = val {
             validate_string(s, field_name, field_label, field, &mut errors);
@@ -195,6 +208,19 @@ pub async fn validate_for_update(
         // Type checking
         if let Some(err) = check_type(&field.field_type, val, field_name, field_label) {
             errors.push(err);
+            continue;
+        }
+
+        // Master-detail row-level validation
+        if field.field_type == "master_detail" || field.field_type == "MASTER_DETAIL" {
+            let md_errors = validate_master_detail_rows(
+                field_name,
+                field_label,
+                val,
+                field,
+                field.is_required,
+            );
+            errors.extend(md_errors);
             continue;
         }
 
@@ -347,6 +373,20 @@ fn check_type(
         "date" | "date_picker" => val.is_string(), // ISO date strings
         "dropdown" | "radio_group" => val.is_string() || val.is_number(),
         "multi_select" => val.is_array(),
+        "master_detail" | "MASTER_DETAIL" => {
+            // Must be an object with an "items" key that is an array of objects
+            if let Some(obj) = val.as_object() {
+                match obj.get("items") {
+                    Some(items) => items
+                        .as_array()
+                        .map(|arr| arr.iter().all(|item| item.is_object()))
+                        .unwrap_or(false),
+                    None => false,
+                }
+            } else {
+                false
+            }
+        }
         "file" => true, // File handled separately
         _ => true,      // Unknown types pass through
     };
@@ -494,6 +534,146 @@ async fn check_unique(
     } else {
         Ok(())
     }
+}
+
+/// Validate rows inside a master_detail field value.
+/// Checks per-row required columns and numeric type constraints based on detailColumns config.
+fn validate_master_detail_rows(
+    field_name: &str,
+    field_label: &str,
+    val: &Value,
+    field: &crate::lowcode::models::FieldDefinition,
+    is_required: bool,
+) -> Vec<FieldError> {
+    let mut errors = Vec::new();
+
+    let items = match val.get("items").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => {
+            // If field is required, items must exist
+            if is_required {
+                errors.push(FieldError {
+                    field_name: field_name.to_string(),
+                    field_label: field_label.to_string(),
+                    message: format!("{} must contain an items array", field_label),
+                });
+            }
+            return errors;
+        }
+    };
+
+    // If field is required, must have at least one row
+    if is_required && items.is_empty() {
+        errors.push(FieldError {
+            field_name: field_name.to_string(),
+            field_label: field_label.to_string(),
+            message: format!("{} must have at least one row", field_label),
+        });
+        return errors;
+    }
+
+    // Extract detailColumns from field_config or sub_table_columns
+    let detail_columns = field
+        .field_config
+        .get("detailColumns")
+        .and_then(|v| v.as_array())
+        .or_else(|| {
+            field
+                .sub_table_columns
+                .as_ref()
+                .and_then(|v| v.as_array())
+        });
+
+    let columns = match detail_columns {
+        Some(cols) => cols,
+        None => return errors, // No column definitions, skip row-level validation
+    };
+
+    for (row_idx, row) in items.iter().enumerate() {
+        let row_obj = match row.as_object() {
+            Some(o) => o,
+            None => {
+                errors.push(FieldError {
+                    field_name: format!("{}.items[{}]", field_name, row_idx),
+                    field_label: field_label.to_string(),
+                    message: format!("{} row {} must be an object", field_label, row_idx + 1),
+                });
+                continue;
+            }
+        };
+
+        for col_def in columns {
+            let col_key = col_def
+                .get("field_key")
+                .and_then(|v| v.as_str())
+                .or_else(|| col_def.get("field_name").and_then(|v| v.as_str()))
+                .unwrap_or("");
+            if col_key.is_empty() {
+                continue;
+            }
+
+            let col_label = col_def
+                .get("label")
+                .and_then(|v| v.as_str())
+                .unwrap_or(col_key);
+            let col_type = col_def
+                .get("field_type")
+                .and_then(|v| v.as_str())
+                .or_else(|| col_def.get("type").and_then(|v| v.as_str()))
+                .unwrap_or("text");
+            let col_required = col_def
+                .get("required")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            let cell_val = row_obj.get(col_key);
+
+            // Required check
+            if col_required {
+                let is_empty = cell_val.is_none()
+                    || cell_val == Some(&Value::Null)
+                    || cell_val == Some(&Value::String(String::new()));
+                if is_empty {
+                    errors.push(FieldError {
+                        field_name: format!("{}.items[{}].{}", field_name, row_idx, col_key),
+                        field_label: field_label.to_string(),
+                        message: format!(
+                            "{} row {} column {} is required",
+                            field_label,
+                            row_idx + 1,
+                            col_label
+                        ),
+                    });
+                    continue;
+                }
+            }
+
+            // Type check for number/currency columns
+            if let Some(v) = cell_val {
+                if !v.is_null()
+                    && (col_type == "number" || col_type == "currency")
+                    && !v.is_number()
+                    && !v
+                        .as_str()
+                        .map(|s| s.parse::<f64>().is_ok())
+                        .unwrap_or(false)
+                {
+                    errors.push(FieldError {
+                        field_name: format!("{}.items[{}].{}", field_name, row_idx, col_key),
+                        field_label: field_label.to_string(),
+                        message: format!(
+                            "{} row {} column {} must be a number",
+                            field_label,
+                            row_idx + 1,
+                            col_label
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    errors
 }
 
 async fn execute_default_sql(pool: &PgPool, sql: &str) -> Result<Value, AppError> {

@@ -80,61 +80,47 @@ form:
       description: "各品項收貨數量"
       columns: 1
       fields:
-        - field_name: material_name
-          label: "物料名稱"
-          type: TEXT
+        - field_name: grn_items
+          label: "收貨明細"
+          type: MASTER_DETAIL
           required: true
-
-        - field_name: ordered_qty
-          label: "訂購數量"
-          type: NUMBER
-          required: true
-
-        - field_name: received_qty
-          label: "實收數量"
-          type: NUMBER
-          required: true
-
-        - field_name: rejected_qty
-          label: "退回數量"
-          type: NUMBER
-
-        - field_name: batch_number
-          label: "批號"
-          type: TEXT
-
-        - field_name: expiry_date
-          label: "有效期限"
-          type: DATE
-
-        - field_name: inspection_result
-          label: "品檢結果"
-          type: DROPDOWN
-          options:
-            - label: "合格"
-              value: PASS
-            - label: "條件允收"
-              value: CONDITIONAL
-            - label: "不合格"
-              value: FAIL
-
-        - field_name: notes
-          label: "備註"
-          type: TEXTAREA
-          visibility_rule:
-            dependent_field: inspection_result
-            operator: equals
-            value: FAIL
-            action: show
+          sub_table_columns:
+            - field_key: material_name
+              label: "物料名稱"
+              field_type: text
+              required: true
+            - field_key: ordered_qty
+              label: "訂購數量"
+              field_type: number
+              required: true
+            - field_key: received_qty
+              label: "實收數量"
+              field_type: number
+              required: true
+            - field_key: rejected_qty
+              label: "退回數量"
+              field_type: number
+            - field_key: batch_number
+              label: "批號"
+              field_type: text
+            - field_key: expiry_date
+              label: "有效期限"
+              field_type: date
+            - field_key: inspection_result
+              label: "品檢結果"
+              field_type: dropdown
+              options:
+                - label: "合格"
+                  value: "PASS"
+                - label: "條件允收"
+                  value: "CONDITIONAL"
+                - label: "不合格"
+                  value: "FAIL"
+            - field_key: notes
+              label: "備註"
+              field_type: text
 
 cross_field_rules:
-  - name: "收貨數量上限"
-    description: "實收數量不得超過訂購數量的110%"
-    rule_type: VALIDATION
-    source_field: received_qty
-    operator: lte
-    error_message: "實收數量超過訂購數量上限"
-
   - name: "退回數量限制"
     description: "退回數量不可超過實收數量"
     rule_type: VALIDATION

@@ -66,60 +66,31 @@ form:
           default_value_sql: "SELECT CURRENT_DATE::TEXT"
 
     - title: "檢驗項目"
-      columns: 2
+      columns: 1
       fields:
-        - field_name: appearance
-          label: "外觀檢查"
-          type: DROPDOWN
+        - field_name: inspection_items
+          label: "檢驗項目"
+          type: MASTER_DETAIL
           required: true
-          options:
-            - label: "合格"
-              value: PASS
-            - label: "不合格"
-              value: FAIL
-
-        - field_name: weight_check
-          label: "重量檢查"
-          type: DROPDOWN
-          required: true
-          options:
-            - label: "合格"
-              value: PASS
-            - label: "不合格"
-              value: FAIL
-
-        - field_name: taste_check
-          label: "口味檢查"
-          type: DROPDOWN
-          options:
-            - label: "合格"
-              value: PASS
-            - label: "不合格"
-              value: FAIL
-
-        - field_name: packaging_check
-          label: "包裝檢查"
-          type: DROPDOWN
-          required: true
-          options:
-            - label: "合格"
-              value: PASS
-            - label: "不合格"
-              value: FAIL
-
-        - field_name: defect_count
-          label: "缺陷數量"
-          type: NUMBER
-
-        - field_name: defect_description
-          label: "缺陷說明"
-          type: TEXTAREA
-          column_span: 2
-          visibility_rule:
-            dependent_field: defect_count
-            operator: gt
-            value: "0"
-            action: show
+          sub_table_columns:
+            - field_key: check_item
+              label: "檢驗項目"
+              field_type: text
+              required: true
+            - field_key: result
+              label: "結果"
+              field_type: dropdown
+              options:
+                - label: "合格"
+                  value: "PASS"
+                - label: "不合格"
+                  value: "FAIL"
+            - field_key: defect_count
+              label: "缺陷數量"
+              field_type: number
+            - field_key: notes
+              label: "備註"
+              field_type: text
 
     - title: "判定與處置"
       columns: 2

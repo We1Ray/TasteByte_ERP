@@ -65,24 +65,25 @@ form:
     - title: "出貨明細"
       columns: 1
       fields:
-        - field_name: material_name
-          label: "商品名稱"
-          type: TEXT
+        - field_name: delivery_items
+          label: "出貨明細"
+          type: MASTER_DETAIL
           required: true
-
-        - field_name: ordered_qty
-          label: "訂購數量"
-          type: NUMBER
-          required: true
-
-        - field_name: shipped_qty
-          label: "出貨數量"
-          type: NUMBER
-          required: true
-
-        - field_name: batch_number
-          label: "批號"
-          type: TEXT
+          sub_table_columns:
+            - field_key: material_name
+              label: "商品名稱"
+              field_type: text
+              required: true
+            - field_key: ordered_qty
+              label: "訂購數量"
+              field_type: number
+            - field_key: shipped_qty
+              label: "出貨數量"
+              field_type: number
+              required: true
+            - field_key: batch_number
+              label: "批號"
+              field_type: text
 
     - title: "運送資訊"
       columns: 2
@@ -109,15 +110,6 @@ form:
             operator: equals
             value: SIGNED
             action: show
-
-cross_field_rules:
-  - name: "出貨數量限制"
-    description: "出貨數量不可超過訂購數量"
-    rule_type: VALIDATION
-    source_field: shipped_qty
-    operator: lte
-    target_field: ordered_qty
-    error_message: "出貨數量不可超過訂購數量"
 
 output_rules:
   - name: "出貨完成通知財務"

@@ -262,7 +262,9 @@ pub fn validate_cross_field_rules(
     errors
 }
 
-/// Apply calculation formulas to data
+/// Apply calculation formulas to data.
+/// Supports per-row formulas for master_detail fields when target_field contains a dot,
+/// e.g. "order_items.row_total" applies the formula to each row in order_items.items[].
 pub fn apply_formulas(formulas: &[CalculationFormula], data: &mut serde_json::Value) {
     let obj = match data.as_object_mut() {
         Some(o) => o,
@@ -270,9 +272,31 @@ pub fn apply_formulas(formulas: &[CalculationFormula], data: &mut serde_json::Va
     };
 
     for formula in formulas {
-        let result = evaluate_formula(&formula.formula, &serde_json::Value::Object(obj.clone()));
-        if let Some(val) = result {
-            obj.insert(formula.target_field.clone(), val);
+        if let Some(dot_pos) = formula.target_field.find('.') {
+            // Per-row formula: "master_detail_field.column_name"
+            let md_field = &formula.target_field[..dot_pos];
+            let row_col = &formula.target_field[dot_pos + 1..];
+
+            if let Some(md_val) = obj.get_mut(md_field) {
+                if let Some(items) = md_val.get_mut("items").and_then(|v| v.as_array_mut()) {
+                    for row in items.iter_mut() {
+                        // Evaluate formula in the context of each row
+                        let result = evaluate_formula(&formula.formula, row);
+                        if let Some(val) = result {
+                            if let Some(row_obj) = row.as_object_mut() {
+                                row_obj.insert(row_col.to_string(), val);
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Standard top-level formula
+            let result =
+                evaluate_formula(&formula.formula, &serde_json::Value::Object(obj.clone()));
+            if let Some(val) = result {
+                obj.insert(formula.target_field.clone(), val);
+            }
         }
     }
 }

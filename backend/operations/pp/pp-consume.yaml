@@ -49,26 +49,28 @@ form:
               value: FULL
 
     - title: "用料記錄"
-      columns: 2
+      columns: 1
       fields:
-        - field_name: material_consumed
-          label: "投入原料"
-          type: TEXT
+        - field_name: consumption_items
+          label: "用料記錄"
+          type: MASTER_DETAIL
           required: true
-
-        - field_name: planned_qty
-          label: "計畫用量"
-          type: NUMBER
-          required: true
-
-        - field_name: actual_qty
-          label: "實際用量"
-          type: NUMBER
-          required: true
-
-        - field_name: variance
-          label: "差異"
-          type: NUMBER
+          sub_table_columns:
+            - field_key: material_consumed
+              label: "投入原料"
+              field_type: text
+              required: true
+            - field_key: planned_qty
+              label: "計畫用量"
+              field_type: number
+              required: true
+            - field_key: actual_qty
+              label: "實際用量"
+              field_type: number
+              required: true
+            - field_key: variance
+              label: "差異"
+              field_type: number
 
     - title: "產出記錄"
       columns: 2
@@ -91,23 +93,7 @@ form:
           type: TEXTAREA
           column_span: 2
 
-cross_field_rules:
-  - name: "用量檢查"
-    description: "實際用量必須大於0"
-    rule_type: VALIDATION
-    source_field: actual_qty
-    operator: gt
-    target_value: "0"
-    error_message: "實際用量必須大於0"
-
 calculation_formulas:
-  - target_field: variance
-    formula: "actual_qty - planned_qty"
-    trigger_fields:
-      - actual_qty
-      - planned_qty
-    description: "用料差異 = 實際用量 - 計畫用量"
-
   - target_field: yield_rate
     formula: "output_qty / (output_qty + defect_qty) * 100"
     trigger_fields:
