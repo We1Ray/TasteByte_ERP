@@ -325,6 +325,45 @@ pub struct FiscalPeriod {
     pub status: Option<String>,
 }
 
+// --- Add / Update Purchase Order Items (sub-table CRUD) ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddPurchaseOrderItem {
+    pub material_id: Uuid,
+    pub quantity: Decimal,
+    pub unit_price: Decimal,
+    pub uom_id: Option<Uuid>,
+    pub delivery_date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdatePurchaseOrderItem {
+    pub quantity: Option<Decimal>,
+    pub unit_price: Option<Decimal>,
+    pub uom_id: Option<Uuid>,
+    pub delivery_date: Option<NaiveDate>,
+}
+
+// --- Add / Update Goods Receipt Items (sub-table CRUD) ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddGoodsReceiptItem {
+    pub po_item_id: Option<Uuid>,
+    pub material_id: Uuid,
+    pub ordered_quantity: Option<Decimal>,
+    pub received_quantity: Decimal,
+    pub rejected_quantity: Option<Decimal>,
+    pub uom_id: Option<Uuid>,
+    pub batch_number: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateGoodsReceiptItem {
+    pub received_quantity: Option<Decimal>,
+    pub rejected_quantity: Option<Decimal>,
+    pub batch_number: Option<String>,
+    pub notes: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

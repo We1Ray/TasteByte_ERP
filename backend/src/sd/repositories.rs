@@ -509,6 +509,189 @@ pub async fn update_so_item_delivered_on_conn(
     Ok(())
 }
 
+// --- Sales Order Item sub-resource CRUD ---
+
+pub async fn get_sales_order_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    item_id: Uuid,
+) -> Result<SalesOrderItem, AppError> {
+    sqlx::query_as::<_, SalesOrderItem>(
+        "SELECT * FROM sd_sales_order_items WHERE id = $1",
+    )
+    .bind(item_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Sales order item not found".to_string()))
+}
+
+pub async fn next_so_line_number_on_conn(
+    conn: &mut sqlx::PgConnection,
+    so_id: Uuid,
+) -> Result<i32, AppError> {
+    let (next,): (i32,) = sqlx::query_as(
+        "SELECT COALESCE(MAX(line_number), 0) + 1 FROM sd_sales_order_items WHERE sales_order_id = $1",
+    )
+    .bind(so_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(next)
+}
+
+pub async fn insert_so_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    so_id: Uuid,
+    line_number: i32,
+    input: &AddSalesOrderItem,
+    total_price: rust_decimal::Decimal,
+) -> Result<SalesOrderItem, AppError> {
+    let row = sqlx::query_as::<_, SalesOrderItem>(
+        "INSERT INTO sd_sales_order_items (sales_order_id, line_number, material_id, quantity, unit_price, total_price, uom_id) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+    )
+    .bind(so_id)
+    .bind(line_number)
+    .bind(input.material_id)
+    .bind(input.quantity)
+    .bind(input.unit_price)
+    .bind(total_price)
+    .bind(input.uom_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+pub async fn update_so_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    item: &SalesOrderItem,
+    input: &UpdateSalesOrderItem,
+) -> Result<SalesOrderItem, AppError> {
+    let quantity = input.quantity.unwrap_or(item.quantity);
+    let unit_price = input.unit_price.unwrap_or(item.unit_price);
+    let total_price = quantity * unit_price;
+    let uom_id = if input.uom_id.is_some() { input.uom_id } else { item.uom_id };
+
+    let row = sqlx::query_as::<_, SalesOrderItem>(
+        "UPDATE sd_sales_order_items SET quantity = $2, unit_price = $3, total_price = $4, uom_id = $5 \
+         WHERE id = $1 RETURNING *",
+    )
+    .bind(item.id)
+    .bind(quantity)
+    .bind(unit_price)
+    .bind(total_price)
+    .bind(uom_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+pub async fn delete_so_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM sd_sales_order_items WHERE id = $1")
+        .bind(item_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+pub async fn count_so_items_on_conn(
+    conn: &mut sqlx::PgConnection,
+    so_id: Uuid,
+) -> Result<i64, AppError> {
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM sd_sales_order_items WHERE sales_order_id = $1",
+    )
+    .bind(so_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(count)
+}
+
+pub async fn recalculate_so_total_on_conn(
+    conn: &mut sqlx::PgConnection,
+    so_id: Uuid,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE sd_sales_orders SET total_amount = \
+         (SELECT COALESCE(SUM(total_price), 0) FROM sd_sales_order_items WHERE sales_order_id = $1), \
+         updated_at = NOW() WHERE id = $1",
+    )
+    .bind(so_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+// --- Delivery Item sub-resource CRUD ---
+
+pub async fn get_delivery_on_conn(
+    conn: &mut sqlx::PgConnection,
+    id: Uuid,
+) -> Result<Delivery, AppError> {
+    sqlx::query_as::<_, Delivery>("SELECT * FROM sd_deliveries WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Delivery not found".to_string()))
+}
+
+pub async fn get_delivery_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    item_id: Uuid,
+) -> Result<DeliveryItem, AppError> {
+    sqlx::query_as::<_, DeliveryItem>(
+        "SELECT * FROM sd_delivery_items WHERE id = $1",
+    )
+    .bind(item_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Delivery item not found".to_string()))
+}
+
+pub async fn insert_delivery_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    delivery_id: Uuid,
+    input: &AddDeliveryItem,
+) -> Result<DeliveryItem, AppError> {
+    let row = sqlx::query_as::<_, DeliveryItem>(
+        "INSERT INTO sd_delivery_items (delivery_id, sales_order_item_id, quantity) \
+         VALUES ($1, $2, $3) RETURNING *",
+    )
+    .bind(delivery_id)
+    .bind(input.sales_order_item_id)
+    .bind(input.quantity)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+pub async fn update_delivery_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    item_id: Uuid,
+    quantity: rust_decimal::Decimal,
+) -> Result<DeliveryItem, AppError> {
+    let row = sqlx::query_as::<_, DeliveryItem>(
+        "UPDATE sd_delivery_items SET quantity = $2 WHERE id = $1 RETURNING *",
+    )
+    .bind(item_id)
+    .bind(quantity)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+pub async fn delete_delivery_item_on_conn(
+    conn: &mut sqlx::PgConnection,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM sd_delivery_items WHERE id = $1")
+        .bind(item_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 pub async fn next_number(pool: &PgPool, object_type: &str) -> Result<String, AppError> {
     crate::shared::number_range::next_number(pool, object_type).await
 }

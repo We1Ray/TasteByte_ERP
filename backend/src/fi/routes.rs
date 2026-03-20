@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 
@@ -45,6 +45,14 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/journal-entries/{id}", get(handlers::get_journal_entry))
         .route(
+            "/journal-entries/{je_id}/items",
+            post(handlers::add_journal_item),
+        )
+        .route(
+            "/journal-entries/{je_id}/items/{item_id}",
+            put(handlers::update_journal_item).delete(handlers::delete_journal_item),
+        )
+        .route(
             "/journal-entries/{id}/post",
             post(handlers::post_journal_entry),
         )
@@ -53,6 +61,7 @@ pub fn routes() -> Router<AppState> {
             "/ar-invoices",
             get(handlers::list_ar_invoices).post(handlers::create_ar_invoice),
         )
+        .route("/ar-invoices/{id}", get(handlers::get_ar_invoice))
         .route(
             "/ar-invoices/{id}/payment",
             post(handlers::record_ar_payment),
@@ -62,6 +71,7 @@ pub fn routes() -> Router<AppState> {
             "/ap-invoices",
             get(handlers::list_ap_invoices).post(handlers::create_ap_invoice),
         )
+        .route("/ap-invoices/{id}", get(handlers::get_ap_invoice))
         .route(
             "/ap-invoices/{id}/payment",
             post(handlers::record_ap_payment),

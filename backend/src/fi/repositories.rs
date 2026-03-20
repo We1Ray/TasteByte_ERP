@@ -782,3 +782,93 @@ pub async fn next_number_on_conn(
 ) -> Result<String, AppError> {
     crate::shared::number_range::next_number_on_conn(conn, object_type).await
 }
+
+// --- Journal Item Sub-table CRUD ---
+
+pub async fn get_journal_entry_status(pool: &PgPool, je_id: Uuid) -> Result<String, AppError> {
+    let (status,): (String,) =
+        sqlx::query_as("SELECT status FROM fi_journal_entries WHERE id = $1")
+            .bind(je_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Journal entry not found".to_string()))?;
+    Ok(status)
+}
+
+pub async fn next_journal_item_line_number(pool: &PgPool, je_id: Uuid) -> Result<i32, AppError> {
+    let (max_line,): (Option<i32>,) = sqlx::query_as(
+        "SELECT MAX(line_number) FROM fi_journal_items WHERE journal_entry_id = $1",
+    )
+    .bind(je_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(max_line.unwrap_or(0) + 1)
+}
+
+pub async fn add_journal_item(
+    pool: &PgPool,
+    je_id: Uuid,
+    line_number: i32,
+    input: &AddJournalItem,
+) -> Result<JournalItem, AppError> {
+    let row = sqlx::query_as::<_, JournalItem>(
+        "INSERT INTO fi_journal_items (journal_entry_id, line_number, account_id, debit_amount, credit_amount, cost_center_id, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *"
+    )
+    .bind(je_id)
+    .bind(line_number)
+    .bind(input.account_id)
+    .bind(input.debit_amount)
+    .bind(input.credit_amount)
+    .bind(input.cost_center_id)
+    .bind(&input.description)
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+pub async fn update_journal_item(
+    pool: &PgPool,
+    je_id: Uuid,
+    item_id: Uuid,
+    input: &UpdateJournalItem,
+) -> Result<JournalItem, AppError> {
+    let row = sqlx::query_as::<_, JournalItem>(
+        r#"UPDATE fi_journal_items SET
+            account_id = COALESCE($3, account_id),
+            debit_amount = COALESCE($4, debit_amount),
+            credit_amount = COALESCE($5, credit_amount),
+            description = COALESCE($6, description),
+            cost_center_id = COALESCE($7, cost_center_id)
+        WHERE id = $2 AND journal_entry_id = $1
+        RETURNING *"#,
+    )
+    .bind(je_id)
+    .bind(item_id)
+    .bind(input.account_id)
+    .bind(input.debit_amount)
+    .bind(input.credit_amount)
+    .bind(&input.description)
+    .bind(input.cost_center_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Journal item not found".to_string()))?;
+    Ok(row)
+}
+
+pub async fn delete_journal_item(
+    pool: &PgPool,
+    je_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let result = sqlx::query(
+        "DELETE FROM fi_journal_items WHERE id = $1 AND journal_entry_id = $2",
+    )
+    .bind(item_id)
+    .bind(je_id)
+    .execute(pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Journal item not found".to_string()));
+    }
+    Ok(())
+}

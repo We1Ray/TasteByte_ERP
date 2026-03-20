@@ -116,3 +116,20 @@ pub struct StockCountItem {
     pub counted_quantity: Option<Decimal>,
     pub difference: Option<Decimal>,
 }
+
+// --- Stock Count Item Sub-table CRUD ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddStockCountItem {
+    pub material_id: Uuid,
+    pub storage_bin_id: Option<Uuid>,
+    pub book_quantity: Decimal,
+    pub counted_quantity: Option<Decimal>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateStockCountItem {
+    pub material_id: Option<Uuid>,
+    pub storage_bin_id: Option<Uuid>,
+    pub book_quantity: Option<Decimal>,
+    pub counted_quantity: Option<Decimal>,
+}

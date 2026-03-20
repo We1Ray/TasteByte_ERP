@@ -133,6 +133,34 @@ pub struct DeliveryItem {
     pub warehouse_id: Option<Uuid>,
 }
 
+// --- Add/Update Sales Order Item (sub-resource CRUD) ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddSalesOrderItem {
+    pub material_id: Uuid,
+    pub quantity: Decimal,
+    pub unit_price: Decimal,
+    pub uom_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateSalesOrderItem {
+    pub quantity: Option<Decimal>,
+    pub unit_price: Option<Decimal>,
+    pub uom_id: Option<Uuid>,
+}
+
+// --- Add/Update Delivery Item (sub-resource CRUD) ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddDeliveryItem {
+    pub sales_order_item_id: Uuid,
+    pub quantity: Decimal,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateDeliveryItem {
+    pub quantity: Option<Decimal>,
+}
+
 // SD Invoices
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct SdInvoice {

@@ -23,11 +23,20 @@ pub fn routes() -> Router<AppState> {
             "/stock-transfers",
             get(handlers::list_stock_transfers).post(handlers::create_stock_transfer),
         )
+        .route("/stock-transfers/{id}", get(handlers::get_stock_transfer))
         .route(
             "/stock-counts",
             get(handlers::list_stock_counts).post(handlers::create_stock_count),
         )
         .route("/stock-counts/{id}", get(handlers::get_stock_count))
+        .route(
+            "/stock-counts/{sc_id}/items",
+            post(handlers::add_stock_count_item),
+        )
+        .route(
+            "/stock-counts/{sc_id}/items/{item_id}",
+            put(handlers::update_stock_count_item).delete(handlers::delete_stock_count_item),
+        )
         .route(
             "/stock-counts/{id}/complete",
             put(handlers::complete_stock_count),

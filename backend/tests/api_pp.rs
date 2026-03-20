@@ -249,6 +249,281 @@ async fn pp_report_production_analysis() {
 }
 
 // ---------------------------------------------------------------------------
+// PP - BOM Item Sub-table CRUD
+// ---------------------------------------------------------------------------
+
+/// Helper: create a BOM with one item. Returns (bom_id, component_material_id).
+async fn create_bom_with_item(
+    server: &axum_test::TestServer,
+    token: &str,
+) -> (String, String) {
+    let mat_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "name": "BOM Item Test Finished",
+            "material_type": "FINISHED"
+        }))
+        .await;
+    let finished_id = mat_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let comp_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "name": "BOM Item Test Component",
+            "material_type": "RAW"
+        }))
+        .await;
+    let component_id = comp_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let bom_resp = server
+        .post("/api/v1/pp/boms")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "material_id": finished_id,
+            "name": "BOM Item Test BOM",
+            "items": [{
+                "component_material_id": component_id,
+                "quantity": "2.5"
+            }]
+        }))
+        .await;
+    bom_resp.assert_status_ok();
+    let bom_id = bom_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    (bom_id, component_id)
+}
+
+#[tokio::test]
+async fn pp_add_bom_item() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (bom_id, component_id) = create_bom_with_item(&server, &token).await;
+
+    let resp = server
+        .post(&format!("/api/v1/pp/boms/{}/items", bom_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "component_material_id": component_id,
+            "quantity": "1.0"
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+    assert!(body["data"]["id"].is_string());
+}
+
+#[tokio::test]
+async fn pp_update_bom_item() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (bom_id, _component_id) = create_bom_with_item(&server, &token).await;
+
+    // Get BOM detail to find item_id
+    let detail_resp = server
+        .get(&format!("/api/v1/pp/boms/{}", bom_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    detail_resp.assert_status_ok();
+    let detail: serde_json::Value = detail_resp.json();
+    let item_id = detail["data"]["items"][0]["id"].as_str().unwrap();
+
+    let resp = server
+        .put(&format!("/api/v1/pp/boms/{}/items/{}", bom_id, item_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "quantity": "5.0",
+            "scrap_percentage": "2.5"
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn pp_delete_bom_item() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (bom_id, component_id) = create_bom_with_item(&server, &token).await;
+
+    // Add a second item so we can delete one
+    let add_resp = server
+        .post(&format!("/api/v1/pp/boms/{}/items", bom_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "component_material_id": component_id,
+            "quantity": "0.5"
+        }))
+        .await;
+    add_resp.assert_status_ok();
+    let added_item_id = add_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = server
+        .delete(&format!(
+            "/api/v1/pp/boms/{}/items/{}",
+            bom_id, added_item_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+// ---------------------------------------------------------------------------
+// PP - Routing Operation Sub-table CRUD
+// ---------------------------------------------------------------------------
+
+/// Helper: create a routing with one operation. Returns routing_id.
+async fn create_routing_with_op(
+    server: &axum_test::TestServer,
+    token: &str,
+) -> String {
+    let mat_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "name": "Routing Op Test Material",
+            "material_type": "FINISHED"
+        }))
+        .await;
+    let material_id = mat_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let routing_resp = server
+        .post("/api/v1/pp/routings")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "material_id": material_id,
+            "name": "Routing Op Test",
+            "operations": [{
+                "operation_number": 10,
+                "work_center": "WC-MILL",
+                "description": "Milling",
+                "setup_time_minutes": 10,
+                "run_time_minutes": 20
+            }]
+        }))
+        .await;
+    routing_resp.assert_status_ok();
+    routing_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+#[tokio::test]
+async fn pp_add_routing_operation() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let routing_id = create_routing_with_op(&server, &token).await;
+
+    let resp = server
+        .post(&format!(
+            "/api/v1/pp/routings/{}/operations",
+            routing_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "operation_number": 20,
+            "work_center": "WC-ASSEMBLY",
+            "description": "Assembly step",
+            "setup_time_minutes": 5,
+            "run_time_minutes": 15
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+    assert!(body["data"]["id"].is_string());
+}
+
+#[tokio::test]
+async fn pp_update_routing_operation() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let routing_id = create_routing_with_op(&server, &token).await;
+
+    // Get routing detail to find operation_id
+    let detail_resp = server
+        .get(&format!("/api/v1/pp/routings/{}", routing_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    detail_resp.assert_status_ok();
+    let detail: serde_json::Value = detail_resp.json();
+    let op_id = detail["data"]["operations"][0]["id"].as_str().unwrap();
+
+    let resp = server
+        .put(&format!(
+            "/api/v1/pp/routings/{}/operations/{}",
+            routing_id, op_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "work_center": "WC-UPDATED",
+            "run_time_minutes": 45
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn pp_delete_routing_operation() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let routing_id = create_routing_with_op(&server, &token).await;
+
+    // Add a second operation so we can delete one
+    let add_resp = server
+        .post(&format!(
+            "/api/v1/pp/routings/{}/operations",
+            routing_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "operation_number": 30,
+            "work_center": "WC-PAINT",
+            "description": "Painting"
+        }))
+        .await;
+    add_resp.assert_status_ok();
+    let added_op_id = add_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = server
+        .delete(&format!(
+            "/api/v1/pp/routings/{}/operations/{}",
+            routing_id, added_op_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+// ---------------------------------------------------------------------------
 // Unauthenticated access must be rejected
 // ---------------------------------------------------------------------------
 

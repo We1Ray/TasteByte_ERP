@@ -65,6 +65,54 @@ pub async fn create_stock_transfer(
         .await
 }
 
+// --- Stock Count Item Sub-table CRUD ---
+
+fn ensure_planned_status(status: &str) -> Result<(), AppError> {
+    if status != "PLANNED" {
+        return Err(AppError::Validation(
+            "Stock count must be in PLANNED status to modify items".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub async fn add_stock_count_item(
+    pool: &PgPool,
+    sc_id: Uuid,
+    input: CreateStockCountItem,
+) -> Result<StockCountItem, AppError> {
+    let status = repositories::get_stock_count_status(pool, sc_id).await?;
+    ensure_planned_status(&status)?;
+    let add_input = AddStockCountItem {
+        material_id: input.material_id,
+        storage_bin_id: input.storage_bin_id,
+        book_quantity: input.book_quantity,
+        counted_quantity: input.counted_quantity,
+    };
+    repositories::add_stock_count_item(pool, sc_id, &add_input).await
+}
+
+pub async fn update_stock_count_item(
+    pool: &PgPool,
+    sc_id: Uuid,
+    item_id: Uuid,
+    input: UpdateStockCountItem,
+) -> Result<StockCountItem, AppError> {
+    let status = repositories::get_stock_count_status(pool, sc_id).await?;
+    ensure_planned_status(&status)?;
+    repositories::update_stock_count_item(pool, sc_id, item_id, &input).await
+}
+
+pub async fn delete_stock_count_item(
+    pool: &PgPool,
+    sc_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let status = repositories::get_stock_count_status(pool, sc_id).await?;
+    ensure_planned_status(&status)?;
+    repositories::delete_stock_count_item(pool, sc_id, item_id).await
+}
+
 pub async fn list_stock_counts(
     pool: &PgPool,
     params: &ListParams,

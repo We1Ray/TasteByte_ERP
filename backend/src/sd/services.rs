@@ -65,6 +65,49 @@ pub async fn create_sales_order(
     repositories::create_sales_order(pool, &order_number, &input, user_id).await
 }
 
+/// Cancel a sales order: release reservations if CONFIRMED.
+pub async fn cancel_sales_order(
+    pool: &PgPool,
+    so_id: Uuid,
+    user_id: Uuid,
+) -> Result<SalesOrder, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let so = repositories::get_sales_order_on_conn(&mut *tx, so_id).await?;
+    status::validate_transition(DocumentType::SalesOrder, &so.status, "CANCELLED")?;
+
+    // If order was CONFIRMED, release reserved stock
+    if so.status == "CONFIRMED" {
+        let items = repositories::get_sales_order_items_on_conn(&mut *tx, so_id).await?;
+        for item in &items {
+            // Release reserved stock (best-effort: ignore errors if reservation already released)
+            let _ = crate::mm::repositories::release_stock_on_conn(
+                &mut *tx,
+                item.material_id,
+                None,
+                item.quantity,
+            )
+            .await;
+        }
+    }
+
+    let result =
+        repositories::update_sales_order_status_on_conn(&mut *tx, so_id, "CANCELLED").await?;
+    status_history::record_transition(
+        &mut *tx,
+        &DocumentType::SalesOrder,
+        so_id,
+        Some(&so.status),
+        "CANCELLED",
+        user_id,
+        None,
+    )
+    .await?;
+
+    tx.commit().await?;
+    Ok(result)
+}
+
 /// Confirm a sales order: validate stock availability and reserve inventory.
 pub async fn confirm_sales_order(
     pool: &PgPool,
@@ -135,6 +178,212 @@ pub async fn confirm_sales_order(
 
     tx.commit().await?;
     Ok(result)
+}
+
+// --- Sales Order Item sub-resource CRUD ---
+
+pub async fn add_sales_order_item(
+    pool: &PgPool,
+    so_id: Uuid,
+    input: AddSalesOrderItem,
+) -> Result<SalesOrderItem, AppError> {
+    let mut tx = pool.begin().await?;
+
+    if input.quantity <= Decimal::ZERO {
+        return Err(AppError::Validation("Quantity must be positive".to_string()));
+    }
+    if input.unit_price < Decimal::ZERO {
+        return Err(AppError::Validation("Unit price must not be negative".to_string()));
+    }
+
+    let so = repositories::get_sales_order_on_conn(&mut *tx, so_id).await?;
+    if so.status != "DRAFT" {
+        return Err(AppError::Validation(format!(
+            "Cannot modify sales order in status '{}'",
+            so.status
+        )));
+    }
+
+    let line_number = repositories::next_so_line_number_on_conn(&mut *tx, so_id).await?;
+    let total_price = input.quantity * input.unit_price;
+
+    let item =
+        repositories::insert_so_item_on_conn(&mut *tx, so_id, line_number, &input, total_price)
+            .await?;
+
+    repositories::recalculate_so_total_on_conn(&mut *tx, so_id).await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn update_sales_order_item(
+    pool: &PgPool,
+    so_id: Uuid,
+    item_id: Uuid,
+    input: UpdateSalesOrderItem,
+) -> Result<SalesOrderItem, AppError> {
+    if let Some(q) = input.quantity {
+        if q <= Decimal::ZERO {
+            return Err(AppError::Validation("Quantity must be positive".to_string()));
+        }
+    }
+    if let Some(p) = input.unit_price {
+        if p < Decimal::ZERO {
+            return Err(AppError::Validation("Unit price must not be negative".to_string()));
+        }
+    }
+
+    let mut tx = pool.begin().await?;
+
+    let so = repositories::get_sales_order_on_conn(&mut *tx, so_id).await?;
+    if so.status != "DRAFT" {
+        return Err(AppError::Validation(format!(
+            "Cannot modify sales order in status '{}'",
+            so.status
+        )));
+    }
+
+    let existing = repositories::get_sales_order_item_on_conn(&mut *tx, item_id).await?;
+    if existing.sales_order_id != so_id {
+        return Err(AppError::NotFound(
+            "Sales order item not found in this order".to_string(),
+        ));
+    }
+
+    let item = repositories::update_so_item_on_conn(&mut *tx, &existing, &input).await?;
+
+    repositories::recalculate_so_total_on_conn(&mut *tx, so_id).await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn delete_sales_order_item(
+    pool: &PgPool,
+    so_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+
+    let so = repositories::get_sales_order_on_conn(&mut *tx, so_id).await?;
+    if so.status != "DRAFT" {
+        return Err(AppError::Validation(format!(
+            "Cannot modify sales order in status '{}'",
+            so.status
+        )));
+    }
+
+    let existing = repositories::get_sales_order_item_on_conn(&mut *tx, item_id).await?;
+    if existing.sales_order_id != so_id {
+        return Err(AppError::NotFound(
+            "Sales order item not found in this order".to_string(),
+        ));
+    }
+
+    let count = repositories::count_so_items_on_conn(&mut *tx, so_id).await?;
+    if count <= 1 {
+        return Err(AppError::Validation(
+            "Cannot delete the last item from a sales order".to_string(),
+        ));
+    }
+
+    repositories::delete_so_item_on_conn(&mut *tx, item_id).await?;
+    repositories::recalculate_so_total_on_conn(&mut *tx, so_id).await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+// --- Delivery Item sub-resource CRUD ---
+
+pub async fn add_delivery_item(
+    pool: &PgPool,
+    del_id: Uuid,
+    input: AddDeliveryItem,
+) -> Result<DeliveryItem, AppError> {
+    if input.quantity <= Decimal::ZERO {
+        return Err(AppError::Validation("Quantity must be positive".to_string()));
+    }
+
+    let mut tx = pool.begin().await?;
+
+    let delivery = repositories::get_delivery_on_conn(&mut *tx, del_id).await?;
+    if delivery.status != "CREATED" {
+        return Err(AppError::Validation(format!(
+            "Cannot modify delivery in status '{}'",
+            delivery.status
+        )));
+    }
+
+    let item = repositories::insert_delivery_item_on_conn(&mut *tx, del_id, &input).await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn update_delivery_item(
+    pool: &PgPool,
+    del_id: Uuid,
+    item_id: Uuid,
+    input: UpdateDeliveryItem,
+) -> Result<DeliveryItem, AppError> {
+    if let Some(q) = input.quantity {
+        if q <= Decimal::ZERO {
+            return Err(AppError::Validation("Quantity must be positive".to_string()));
+        }
+    }
+
+    let mut tx = pool.begin().await?;
+
+    let delivery = repositories::get_delivery_on_conn(&mut *tx, del_id).await?;
+    if delivery.status != "CREATED" {
+        return Err(AppError::Validation(format!(
+            "Cannot modify delivery in status '{}'",
+            delivery.status
+        )));
+    }
+
+    let existing = repositories::get_delivery_item_on_conn(&mut *tx, item_id).await?;
+    if existing.delivery_id != del_id {
+        return Err(AppError::NotFound(
+            "Delivery item not found in this delivery".to_string(),
+        ));
+    }
+
+    let quantity = input.quantity.unwrap_or(existing.quantity);
+    let item = repositories::update_delivery_item_on_conn(&mut *tx, item_id, quantity).await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn delete_delivery_item(
+    pool: &PgPool,
+    del_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+
+    let delivery = repositories::get_delivery_on_conn(&mut *tx, del_id).await?;
+    if delivery.status != "CREATED" {
+        return Err(AppError::Validation(format!(
+            "Cannot modify delivery in status '{}'",
+            delivery.status
+        )));
+    }
+
+    let existing = repositories::get_delivery_item_on_conn(&mut *tx, item_id).await?;
+    if existing.delivery_id != del_id {
+        return Err(AppError::NotFound(
+            "Delivery item not found in this delivery".to_string(),
+        ));
+    }
+
+    repositories::delete_delivery_item_on_conn(&mut *tx, item_id).await?;
+
+    tx.commit().await?;
+    Ok(())
 }
 
 pub async fn list_deliveries(

@@ -162,6 +162,52 @@ pub async fn confirm_sales_order(
     Ok(Json(ApiResponse::with_message(so, "Sales order confirmed")))
 }
 
+// --- Sales Order Items (sub-resource CRUD) ---
+
+pub async fn add_sales_order_item(
+    State(state): State<AppState>,
+    _role: RequireRole<SdWrite>,
+    Path(so_id): Path<Uuid>,
+    Json(input): Json<AddSalesOrderItem>,
+) -> Result<Json<ApiResponse<SalesOrderItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::add_sales_order_item(&state.pool, so_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Sales order item added",
+    )))
+}
+
+pub async fn update_sales_order_item(
+    State(state): State<AppState>,
+    _role: RequireRole<SdWrite>,
+    Path((so_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateSalesOrderItem>,
+) -> Result<Json<ApiResponse<SalesOrderItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_sales_order_item(&state.pool, so_id, item_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Sales order item updated",
+    )))
+}
+
+pub async fn delete_sales_order_item(
+    State(state): State<AppState>,
+    _role: RequireRole<SdWrite>,
+    Path((so_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_sales_order_item(&state.pool, so_id, item_id).await?;
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Sales order item deleted",
+    )))
+}
+
 // --- Deliveries ---
 pub async fn list_deliveries(
     State(state): State<AppState>,
@@ -267,6 +313,49 @@ pub async fn get_delivery(
     })))
 }
 
+// --- Delivery Items (sub-resource CRUD) ---
+
+pub async fn add_delivery_item(
+    State(state): State<AppState>,
+    _role: RequireRole<SdWrite>,
+    Path(del_id): Path<Uuid>,
+    Json(input): Json<AddDeliveryItem>,
+) -> Result<Json<ApiResponse<DeliveryItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::add_delivery_item(&state.pool, del_id, input).await?;
+    Ok(Json(ApiResponse::with_message(item, "Delivery item added")))
+}
+
+pub async fn update_delivery_item(
+    State(state): State<AppState>,
+    _role: RequireRole<SdWrite>,
+    Path((del_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateDeliveryItem>,
+) -> Result<Json<ApiResponse<DeliveryItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_delivery_item(&state.pool, del_id, item_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Delivery item updated",
+    )))
+}
+
+pub async fn delete_delivery_item(
+    State(state): State<AppState>,
+    _role: RequireRole<SdWrite>,
+    Path((del_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_delivery_item(&state.pool, del_id, item_id).await?;
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Delivery item deleted",
+    )))
+}
+
 // --- SD Invoices ---
 pub async fn list_sd_invoices(
     State(state): State<AppState>,
@@ -299,6 +388,145 @@ pub async fn create_sd_invoice(
     .await;
 
     Ok(Json(ApiResponse::with_message(invoice, "Invoice created")))
+}
+
+// --- Get SD Invoice by ID ---
+pub async fn get_sd_invoice(
+    State(state): State<AppState>,
+    _role: RequireRole<SdRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<SdInvoice>>, AppError> {
+    let invoice = sqlx::query_as::<_, SdInvoice>("SELECT * FROM sd_invoices WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("SD invoice not found".to_string()))?;
+    Ok(Json(ApiResponse::success(invoice)))
+}
+
+// --- Cancel Sales Order ---
+pub async fn cancel_sales_order(
+    State(state): State<AppState>,
+    role: RequireRole<SdWrite>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<SalesOrder>>, AppError> {
+    let so = services::cancel_sales_order(&state.pool, id, role.claims.sub).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "sd_sales_orders",
+        so.id,
+        "UPDATE",
+        None,
+        serde_json::to_value(serde_json::json!({"status": &so.status})).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        so,
+        "Sales order cancelled",
+    )))
+}
+
+// --- Customer Sales Orders ---
+pub async fn list_customer_sales_orders(
+    State(state): State<AppState>,
+    _role: RequireRole<SdRead>,
+    Path(customer_id): Path<Uuid>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<ApiResponse<PaginatedResponse<SalesOrder>>>, AppError> {
+    // Verify customer exists
+    let _ = sqlx::query("SELECT id FROM sd_customers WHERE id = $1")
+        .bind(customer_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Customer not found".to_string()))?;
+
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM sd_sales_orders WHERE customer_id = $1",
+    )
+    .bind(customer_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let orders = sqlx::query_as::<_, SalesOrder>(
+        "SELECT * FROM sd_sales_orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+    )
+    .bind(customer_id)
+    .bind(params.per_page())
+    .bind(params.offset())
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(ApiResponse::success(PaginatedResponse::from_list_params(orders, count, &params))))
+}
+
+// --- Sales Order Document Flow ---
+#[derive(serde::Serialize)]
+pub struct DocumentFlow {
+    pub sales_order: SalesOrder,
+    pub deliveries: Vec<Delivery>,
+    pub invoices: Vec<SdInvoice>,
+    pub journal_entries: Vec<serde_json::Value>,
+}
+
+pub async fn get_sales_order_document_flow(
+    State(state): State<AppState>,
+    _role: RequireRole<SdRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<DocumentFlow>>, AppError> {
+    let order = sqlx::query_as::<_, SalesOrder>("SELECT * FROM sd_sales_orders WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Sales order not found".to_string()))?;
+
+    let deliveries = sqlx::query_as::<_, Delivery>(
+        "SELECT * FROM sd_deliveries WHERE sales_order_id = $1 ORDER BY created_at",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let invoices = sqlx::query_as::<_, SdInvoice>(
+        "SELECT * FROM sd_invoices WHERE sales_order_id = $1 ORDER BY created_at",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    // FI journal entries linked via reference pattern "SD-INV:INV-XXXX-XXXXX"
+    let invoice_numbers: Vec<String> = invoices.iter().map(|i| format!("SD-INV:{}", i.invoice_number)).collect();
+    let journal_entries = if invoice_numbers.is_empty() {
+        vec![]
+    } else {
+        sqlx::query_as::<_, (uuid::Uuid, String, String, String, chrono::NaiveDate)>(
+            "SELECT id, document_number, status, COALESCE(reference, ''), posting_date \
+             FROM fi_journal_entries WHERE reference = ANY($1)",
+        )
+        .bind(&invoice_numbers)
+        .fetch_all(&state.pool)
+        .await?
+        .into_iter()
+        .map(|(id, doc_num, status, reference, posting_date)| {
+            serde_json::json!({
+                "id": id,
+                "document_number": doc_num,
+                "status": status,
+                "reference": reference,
+                "posting_date": posting_date.to_string(),
+            })
+        })
+        .collect()
+    };
+
+    Ok(Json(ApiResponse::success(DocumentFlow {
+        sales_order: order,
+        deliveries,
+        invoices,
+        journal_entries,
+    })))
 }
 
 // --- Export Sales Orders ---

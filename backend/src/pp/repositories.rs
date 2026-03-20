@@ -334,3 +334,142 @@ pub async fn next_number_on_conn(
 ) -> Result<String, AppError> {
     crate::shared::number_range::next_number_on_conn(conn, object_type).await
 }
+
+// --- BOM Item Sub-table CRUD ---
+
+pub async fn next_bom_item_line_number(pool: &PgPool, bom_id: Uuid) -> Result<i32, AppError> {
+    let (max_line,): (Option<i32>,) =
+        sqlx::query_as("SELECT MAX(line_number) FROM pp_bom_items WHERE bom_id = $1")
+            .bind(bom_id)
+            .fetch_one(pool)
+            .await?;
+    Ok(max_line.unwrap_or(0) + 1)
+}
+
+pub async fn add_bom_item(
+    pool: &PgPool,
+    bom_id: Uuid,
+    line_number: i32,
+    input: &AddBomItem,
+) -> Result<BomItem, AppError> {
+    let row = sqlx::query_as::<_, BomItem>(
+        "INSERT INTO pp_bom_items (bom_id, line_number, component_material_id, quantity, uom_id, scrap_percentage) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+    )
+    .bind(bom_id)
+    .bind(line_number)
+    .bind(input.component_material_id)
+    .bind(input.quantity)
+    .bind(input.uom_id)
+    .bind(input.scrap_percentage.unwrap_or_default())
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+pub async fn update_bom_item(
+    pool: &PgPool,
+    bom_id: Uuid,
+    item_id: Uuid,
+    input: &UpdateBomItem,
+) -> Result<BomItem, AppError> {
+    let row = sqlx::query_as::<_, BomItem>(
+        r#"UPDATE pp_bom_items SET
+            quantity = COALESCE($3, quantity),
+            uom_id = COALESCE($4, uom_id),
+            scrap_percentage = COALESCE($5, scrap_percentage)
+        WHERE id = $2 AND bom_id = $1
+        RETURNING *"#,
+    )
+    .bind(bom_id)
+    .bind(item_id)
+    .bind(input.quantity)
+    .bind(input.uom_id)
+    .bind(input.scrap_percentage)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("BOM item not found".to_string()))?;
+    Ok(row)
+}
+
+pub async fn delete_bom_item(pool: &PgPool, bom_id: Uuid, item_id: Uuid) -> Result<(), AppError> {
+    let result =
+        sqlx::query("DELETE FROM pp_bom_items WHERE id = $1 AND bom_id = $2")
+            .bind(item_id)
+            .bind(bom_id)
+            .execute(pool)
+            .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("BOM item not found".to_string()));
+    }
+    Ok(())
+}
+
+// --- Routing Operation Sub-table CRUD ---
+
+pub async fn add_routing_operation(
+    pool: &PgPool,
+    routing_id: Uuid,
+    input: &AddRoutingOperation,
+) -> Result<RoutingOperation, AppError> {
+    let row = sqlx::query_as::<_, RoutingOperation>(
+        "INSERT INTO pp_routing_operations (routing_id, operation_number, work_center, description, setup_time_minutes, run_time_minutes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+    )
+    .bind(routing_id)
+    .bind(input.operation_number)
+    .bind(&input.work_center)
+    .bind(&input.description)
+    .bind(input.setup_time_minutes.unwrap_or(0))
+    .bind(input.run_time_minutes.unwrap_or(0))
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+pub async fn update_routing_operation(
+    pool: &PgPool,
+    routing_id: Uuid,
+    op_id: Uuid,
+    input: &UpdateRoutingOperation,
+) -> Result<RoutingOperation, AppError> {
+    let row = sqlx::query_as::<_, RoutingOperation>(
+        r#"UPDATE pp_routing_operations SET
+            operation_number = COALESCE($3, operation_number),
+            work_center = COALESCE($4, work_center),
+            description = COALESCE($5, description),
+            setup_time_minutes = COALESCE($6, setup_time_minutes),
+            run_time_minutes = COALESCE($7, run_time_minutes)
+        WHERE id = $2 AND routing_id = $1
+        RETURNING *"#,
+    )
+    .bind(routing_id)
+    .bind(op_id)
+    .bind(input.operation_number)
+    .bind(&input.work_center)
+    .bind(&input.description)
+    .bind(input.setup_time_minutes)
+    .bind(input.run_time_minutes)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Routing operation not found".to_string()))?;
+    Ok(row)
+}
+
+pub async fn delete_routing_operation(
+    pool: &PgPool,
+    routing_id: Uuid,
+    op_id: Uuid,
+) -> Result<(), AppError> {
+    let result = sqlx::query(
+        "DELETE FROM pp_routing_operations WHERE id = $1 AND routing_id = $2",
+    )
+    .bind(op_id)
+    .bind(routing_id)
+    .execute(pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(
+            "Routing operation not found".to_string(),
+        ));
+    }
+    Ok(())
+}

@@ -268,3 +268,55 @@ pub async fn next_number_on_conn(
 ) -> Result<String, AppError> {
     crate::shared::number_range::next_number_on_conn(conn, object_type).await
 }
+
+// --- Inspection Result Update/Delete ---
+
+pub async fn get_inspection_result(
+    pool: &PgPool,
+    result_id: Uuid,
+) -> Result<InspectionResult, AppError> {
+    sqlx::query_as::<_, InspectionResult>("SELECT * FROM qm_inspection_results WHERE id = $1")
+        .bind(result_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Inspection result not found".to_string()))
+}
+
+pub async fn update_inspection_result(
+    pool: &PgPool,
+    result_id: Uuid,
+    input: &UpdateInspectionResult,
+) -> Result<InspectionResult, AppError> {
+    let row = sqlx::query_as::<_, InspectionResult>(
+        r#"UPDATE qm_inspection_results SET
+            characteristic = COALESCE($2, characteristic),
+            target_value = COALESCE($3, target_value),
+            actual_value = COALESCE($4, actual_value),
+            is_conforming = COALESCE($5, is_conforming)
+        WHERE id = $1
+        RETURNING *"#,
+    )
+    .bind(result_id)
+    .bind(&input.characteristic)
+    .bind(&input.target_value)
+    .bind(&input.actual_value)
+    .bind(input.is_conforming)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Inspection result not found".to_string()))?;
+    Ok(row)
+}
+
+pub async fn delete_inspection_result(
+    pool: &PgPool,
+    result_id: Uuid,
+) -> Result<(), AppError> {
+    let result = sqlx::query("DELETE FROM qm_inspection_results WHERE id = $1")
+        .bind(result_id)
+        .execute(pool)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Inspection result not found".to_string()));
+    }
+    Ok(())
+}

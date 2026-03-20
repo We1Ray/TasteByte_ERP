@@ -1,4 +1,34 @@
-use crate::shared::AppError;
+use crate::shared::error::AppError;
+
+/// Check whether a document of the given type can have its child items modified
+/// at the current status. The `doc_type` parameter is a plain string identifier
+/// (e.g. "PURCHASE_ORDER", "BOM") so callers do not need to convert into an enum.
+pub fn is_mutable_status(doc_type: &str, status: &str) -> bool {
+    match doc_type {
+        "PURCHASE_ORDER" => status == "DRAFT",
+        "SALES_ORDER" => status == "DRAFT",
+        "JOURNAL_ENTRY" => status == "DRAFT",
+        "GOODS_RECEIPT" => status == "DRAFT",
+        "DELIVERY" => status == "CREATED",
+        "BOM" | "ROUTING" => true, // master data — always mutable
+        "STOCK_COUNT" => status == "PLANNED",
+        "INSPECTION_LOT" => status == "CREATED",
+        "PAYROLL_RUN" => status == "DRAFT",
+        _ => false,
+    }
+}
+
+/// Convenience wrapper: returns `Ok(())` when child-item modifications are
+/// allowed, or an `AppError::Validation` explaining why they are not.
+pub fn ensure_mutable(doc_type: &str, status: &str) -> Result<(), AppError> {
+    if is_mutable_status(doc_type, status) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!(
+            "Cannot modify items: document status is {status}"
+        )))
+    }
+}
 
 /// Document types for status machine validation
 pub enum DocumentType {
@@ -25,6 +55,7 @@ pub fn validate_transition(doc_type: DocumentType, from: &str, to: &str) -> Resu
                 | ("INVOICED", "CLOSED")
                 | ("DELIVERED", "CLOSED")
                 | ("DRAFT", "CANCELLED")
+                | ("CONFIRMED", "CANCELLED")
         ),
         DocumentType::PurchaseOrder => matches!(
             (from, to),
@@ -33,6 +64,7 @@ pub fn validate_transition(doc_type: DocumentType, from: &str, to: &str) -> Resu
                 | ("RELEASED", "RECEIVED")
                 | ("PARTIALLY_RECEIVED", "RECEIVED")
                 | ("RECEIVED", "CLOSED")
+                | ("PARTIALLY_RECEIVED", "CLOSED")
                 | ("DRAFT", "CANCELLED")
                 | ("RELEASED", "CANCELLED")
         ),
@@ -267,5 +299,102 @@ mod tests {
     #[test]
     fn so_invoiced_to_closed() {
         assert!(validate_transition(DocumentType::SalesOrder, "INVOICED", "CLOSED").is_ok());
+    }
+
+    // --- is_mutable_status / ensure_mutable tests ---
+
+    #[test]
+    fn po_draft_is_mutable() {
+        assert!(is_mutable_status("PURCHASE_ORDER", "DRAFT"));
+    }
+
+    #[test]
+    fn po_released_is_not_mutable() {
+        assert!(!is_mutable_status("PURCHASE_ORDER", "RELEASED"));
+    }
+
+    #[test]
+    fn so_draft_is_mutable() {
+        assert!(is_mutable_status("SALES_ORDER", "DRAFT"));
+    }
+
+    #[test]
+    fn so_confirmed_is_not_mutable() {
+        assert!(!is_mutable_status("SALES_ORDER", "CONFIRMED"));
+    }
+
+    #[test]
+    fn je_draft_is_mutable() {
+        assert!(is_mutable_status("JOURNAL_ENTRY", "DRAFT"));
+    }
+
+    #[test]
+    fn je_posted_is_not_mutable() {
+        assert!(!is_mutable_status("JOURNAL_ENTRY", "POSTED"));
+    }
+
+    #[test]
+    fn goods_receipt_draft_is_mutable() {
+        assert!(is_mutable_status("GOODS_RECEIPT", "DRAFT"));
+    }
+
+    #[test]
+    fn delivery_created_is_mutable() {
+        assert!(is_mutable_status("DELIVERY", "CREATED"));
+    }
+
+    #[test]
+    fn delivery_shipped_is_not_mutable() {
+        assert!(!is_mutable_status("DELIVERY", "SHIPPED"));
+    }
+
+    #[test]
+    fn bom_always_mutable() {
+        assert!(is_mutable_status("BOM", "ACTIVE"));
+        assert!(is_mutable_status("BOM", "ANYTHING"));
+    }
+
+    #[test]
+    fn routing_always_mutable() {
+        assert!(is_mutable_status("ROUTING", "ACTIVE"));
+    }
+
+    #[test]
+    fn stock_count_planned_is_mutable() {
+        assert!(is_mutable_status("STOCK_COUNT", "PLANNED"));
+    }
+
+    #[test]
+    fn stock_count_in_progress_is_not_mutable() {
+        assert!(!is_mutable_status("STOCK_COUNT", "IN_PROGRESS"));
+    }
+
+    #[test]
+    fn inspection_lot_created_is_mutable() {
+        assert!(is_mutable_status("INSPECTION_LOT", "CREATED"));
+    }
+
+    #[test]
+    fn payroll_run_draft_is_mutable() {
+        assert!(is_mutable_status("PAYROLL_RUN", "DRAFT"));
+    }
+
+    #[test]
+    fn unknown_doc_type_is_not_mutable() {
+        assert!(!is_mutable_status("UNKNOWN", "DRAFT"));
+    }
+
+    #[test]
+    fn ensure_mutable_ok() {
+        assert!(ensure_mutable("PURCHASE_ORDER", "DRAFT").is_ok());
+    }
+
+    #[test]
+    fn ensure_mutable_err() {
+        let err = ensure_mutable("PURCHASE_ORDER", "RELEASED").unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Validation error: Cannot modify items: document status is RELEASED"
+        );
     }
 }

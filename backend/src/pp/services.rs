@@ -54,6 +54,64 @@ pub async fn create_routing(pool: &PgPool, input: CreateRouting) -> Result<Routi
     repositories::create_routing(pool, &routing_number, &input).await
 }
 
+// --- BOM Item Sub-table CRUD ---
+
+pub async fn add_bom_item(
+    pool: &PgPool,
+    bom_id: Uuid,
+    input: AddBomItem,
+) -> Result<BomItem, AppError> {
+    // Verify BOM exists
+    repositories::get_bom(pool, bom_id).await?;
+    let line_number = repositories::next_bom_item_line_number(pool, bom_id).await?;
+    repositories::add_bom_item(pool, bom_id, line_number, &input).await
+}
+
+pub async fn update_bom_item(
+    pool: &PgPool,
+    bom_id: Uuid,
+    item_id: Uuid,
+    input: UpdateBomItem,
+) -> Result<BomItem, AppError> {
+    repositories::get_bom(pool, bom_id).await?;
+    repositories::update_bom_item(pool, bom_id, item_id, &input).await
+}
+
+pub async fn delete_bom_item(pool: &PgPool, bom_id: Uuid, item_id: Uuid) -> Result<(), AppError> {
+    repositories::get_bom(pool, bom_id).await?;
+    repositories::delete_bom_item(pool, bom_id, item_id).await
+}
+
+// --- Routing Operation Sub-table CRUD ---
+
+pub async fn add_routing_operation(
+    pool: &PgPool,
+    routing_id: Uuid,
+    input: AddRoutingOperation,
+) -> Result<RoutingOperation, AppError> {
+    repositories::get_routing(pool, routing_id).await?;
+    repositories::add_routing_operation(pool, routing_id, &input).await
+}
+
+pub async fn update_routing_operation(
+    pool: &PgPool,
+    routing_id: Uuid,
+    op_id: Uuid,
+    input: UpdateRoutingOperation,
+) -> Result<RoutingOperation, AppError> {
+    repositories::get_routing(pool, routing_id).await?;
+    repositories::update_routing_operation(pool, routing_id, op_id, &input).await
+}
+
+pub async fn delete_routing_operation(
+    pool: &PgPool,
+    routing_id: Uuid,
+    op_id: Uuid,
+) -> Result<(), AppError> {
+    repositories::get_routing(pool, routing_id).await?;
+    repositories::delete_routing_operation(pool, routing_id, op_id).await
+}
+
 pub async fn list_production_orders(
     pool: &PgPool,
     params: &ListParams,

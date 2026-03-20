@@ -93,6 +93,59 @@ pub async fn create_inspection_result(
     )))
 }
 
+// --- Inspection Result Update/Delete ---
+pub async fn update_inspection_result(
+    State(state): State<AppState>,
+    role: RequireRole<QmWrite>,
+    Path(result_id): Path<Uuid>,
+    Json(input): Json<UpdateInspectionResult>,
+) -> Result<Json<ApiResponse<InspectionResult>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let result = services::update_inspection_result(&state.pool, result_id, input).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "qm_inspection_results",
+        result_id,
+        "UPDATE",
+        None,
+        serde_json::to_value(&result).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        result,
+        "Inspection result updated",
+    )))
+}
+
+pub async fn delete_inspection_result(
+    State(state): State<AppState>,
+    role: RequireRole<QmWrite>,
+    Path(result_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_inspection_result(&state.pool, result_id).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "qm_inspection_results",
+        result_id,
+        "DELETE",
+        None,
+        None,
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Inspection result deleted",
+    )))
+}
+
 // --- Quality Notifications ---
 pub async fn list_quality_notifications(
     State(state): State<AppState>,

@@ -127,6 +127,100 @@ pub async fn create_stock_transfer(
     )))
 }
 
+// --- Get Stock Transfer by ID ---
+pub async fn get_stock_transfer(
+    State(state): State<AppState>,
+    _role: RequireRole<WmRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<StockTransfer>>, AppError> {
+    let transfer = sqlx::query_as::<_, StockTransfer>(
+        "SELECT * FROM wm_stock_transfers WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Stock transfer not found".to_string()))?;
+    Ok(Json(ApiResponse::success(transfer)))
+}
+
+// --- Stock Count Items (sub-table CRUD) ---
+pub async fn add_stock_count_item(
+    State(state): State<AppState>,
+    role: RequireRole<WmWrite>,
+    Path(sc_id): Path<Uuid>,
+    Json(input): Json<CreateStockCountItem>,
+) -> Result<Json<ApiResponse<StockCountItem>>, AppError> {
+    let item = services::add_stock_count_item(&state.pool, sc_id, input).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "wm_stock_count_items",
+        item.id,
+        "CREATE",
+        None,
+        serde_json::to_value(&item).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Stock count item added",
+    )))
+}
+
+pub async fn update_stock_count_item(
+    State(state): State<AppState>,
+    role: RequireRole<WmWrite>,
+    Path((sc_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateStockCountItem>,
+) -> Result<Json<ApiResponse<StockCountItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_stock_count_item(&state.pool, sc_id, item_id, input).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "wm_stock_count_items",
+        item_id,
+        "UPDATE",
+        None,
+        serde_json::to_value(&item).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Stock count item updated",
+    )))
+}
+
+pub async fn delete_stock_count_item(
+    State(state): State<AppState>,
+    role: RequireRole<WmWrite>,
+    Path((sc_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_stock_count_item(&state.pool, sc_id, item_id).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "wm_stock_count_items",
+        item_id,
+        "DELETE",
+        None,
+        None,
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Stock count item deleted",
+    )))
+}
+
 // --- Stock Counts ---
 pub async fn list_stock_counts(
     State(state): State<AppState>,

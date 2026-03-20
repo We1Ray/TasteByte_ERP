@@ -259,6 +259,261 @@ pub async fn list_stock_movements(
     Ok(PaginatedResponse::from_list_params(data, total, params))
 }
 
+// --- Purchase Order Item sub-table CRUD ---
+
+pub async fn add_purchase_order_item(
+    pool: &PgPool,
+    po_id: Uuid,
+    input: AddPurchaseOrderItem,
+) -> Result<PurchaseOrderItem, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let po = repositories::get_purchase_order_on_conn(&mut *tx, po_id).await?;
+    status::ensure_mutable("PURCHASE_ORDER", &po.status)?;
+
+    let next_line: (i32,) = sqlx::query_as(
+        "SELECT COALESCE(MAX(line_number), 0) + 1 FROM mm_purchase_order_items WHERE purchase_order_id = $1",
+    )
+    .bind(po_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let total_price = input.quantity * input.unit_price;
+
+    let item = sqlx::query_as::<_, PurchaseOrderItem>(
+        "INSERT INTO mm_purchase_order_items (purchase_order_id, line_number, material_id, quantity, unit_price, total_price, uom_id, delivery_date) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+    )
+    .bind(po_id)
+    .bind(next_line.0)
+    .bind(input.material_id)
+    .bind(input.quantity)
+    .bind(input.unit_price)
+    .bind(total_price)
+    .bind(input.uom_id)
+    .bind(input.delivery_date)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // Recalculate PO total_amount
+    sqlx::query(
+        "UPDATE mm_purchase_orders SET total_amount = (SELECT COALESCE(SUM(total_price), 0) FROM mm_purchase_order_items WHERE purchase_order_id = $1), updated_at = NOW() WHERE id = $1",
+    )
+    .bind(po_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn update_purchase_order_item(
+    pool: &PgPool,
+    po_id: Uuid,
+    item_id: Uuid,
+    input: UpdatePurchaseOrderItem,
+) -> Result<PurchaseOrderItem, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let po = repositories::get_purchase_order_on_conn(&mut *tx, po_id).await?;
+    status::ensure_mutable("PURCHASE_ORDER", &po.status)?;
+
+    // Check item belongs to this PO
+    let existing = sqlx::query_as::<_, PurchaseOrderItem>(
+        "SELECT * FROM mm_purchase_order_items WHERE id = $1 AND purchase_order_id = $2",
+    )
+    .bind(item_id)
+    .bind(po_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Purchase order item not found".to_string()))?;
+
+    let quantity = input.quantity.unwrap_or(existing.quantity);
+    let unit_price = input.unit_price.unwrap_or(existing.unit_price);
+    let total_price = quantity * unit_price;
+
+    let item = sqlx::query_as::<_, PurchaseOrderItem>(
+        "UPDATE mm_purchase_order_items SET quantity = $3, unit_price = $4, total_price = $5, uom_id = COALESCE($6, uom_id), delivery_date = COALESCE($7, delivery_date) \
+         WHERE id = $1 AND purchase_order_id = $2 RETURNING *",
+    )
+    .bind(item_id)
+    .bind(po_id)
+    .bind(quantity)
+    .bind(unit_price)
+    .bind(total_price)
+    .bind(input.uom_id)
+    .bind(input.delivery_date)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // Recalculate PO total_amount
+    sqlx::query(
+        "UPDATE mm_purchase_orders SET total_amount = (SELECT COALESCE(SUM(total_price), 0) FROM mm_purchase_order_items WHERE purchase_order_id = $1), updated_at = NOW() WHERE id = $1",
+    )
+    .bind(po_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn delete_purchase_order_item(
+    pool: &PgPool,
+    po_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+
+    let po = repositories::get_purchase_order_on_conn(&mut *tx, po_id).await?;
+    status::ensure_mutable("PURCHASE_ORDER", &po.status)?;
+
+    // Check item belongs to this PO
+    let _existing = sqlx::query_as::<_, PurchaseOrderItem>(
+        "SELECT * FROM mm_purchase_order_items WHERE id = $1 AND purchase_order_id = $2",
+    )
+    .bind(item_id)
+    .bind(po_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Purchase order item not found".to_string()))?;
+
+    // Check PO has more than 1 item
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM mm_purchase_order_items WHERE purchase_order_id = $1",
+    )
+    .bind(po_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if count <= 1 {
+        return Err(AppError::Validation(
+            "Cannot delete the last item of a purchase order".to_string(),
+        ));
+    }
+
+    sqlx::query("DELETE FROM mm_purchase_order_items WHERE id = $1 AND purchase_order_id = $2")
+        .bind(item_id)
+        .bind(po_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Recalculate PO total_amount
+    sqlx::query(
+        "UPDATE mm_purchase_orders SET total_amount = (SELECT COALESCE(SUM(total_price), 0) FROM mm_purchase_order_items WHERE purchase_order_id = $1), updated_at = NOW() WHERE id = $1",
+    )
+    .bind(po_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+// --- Goods Receipt Item sub-table CRUD ---
+
+pub async fn add_goods_receipt_item(
+    pool: &PgPool,
+    grn_id: Uuid,
+    input: AddGoodsReceiptItem,
+) -> Result<GoodsReceiptItem, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let grn = repositories::get_goods_receipt_on_conn(&mut *tx, grn_id).await?;
+    status::ensure_mutable("GOODS_RECEIPT", &grn.status)?;
+
+    let item = sqlx::query_as::<_, GoodsReceiptItem>(
+        "INSERT INTO mm_goods_receipt_items (goods_receipt_id, po_item_id, material_id, ordered_quantity, received_quantity, rejected_quantity, uom_id, batch_number, notes) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+    )
+    .bind(grn_id)
+    .bind(input.po_item_id)
+    .bind(input.material_id)
+    .bind(input.ordered_quantity)
+    .bind(input.received_quantity)
+    .bind(input.rejected_quantity)
+    .bind(input.uom_id)
+    .bind(&input.batch_number)
+    .bind(&input.notes)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn update_goods_receipt_item(
+    pool: &PgPool,
+    grn_id: Uuid,
+    item_id: Uuid,
+    input: UpdateGoodsReceiptItem,
+) -> Result<GoodsReceiptItem, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let grn = repositories::get_goods_receipt_on_conn(&mut *tx, grn_id).await?;
+    status::ensure_mutable("GOODS_RECEIPT", &grn.status)?;
+
+    // Check item belongs to this GRN
+    sqlx::query_as::<_, GoodsReceiptItem>(
+        "SELECT * FROM mm_goods_receipt_items WHERE id = $1 AND goods_receipt_id = $2",
+    )
+    .bind(item_id)
+    .bind(grn_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Goods receipt item not found".to_string()))?;
+
+    let item = sqlx::query_as::<_, GoodsReceiptItem>(
+        "UPDATE mm_goods_receipt_items SET \
+         received_quantity = COALESCE($3, received_quantity), \
+         rejected_quantity = COALESCE($4, rejected_quantity), \
+         batch_number = COALESCE($5, batch_number), \
+         notes = COALESCE($6, notes) \
+         WHERE id = $1 AND goods_receipt_id = $2 RETURNING *",
+    )
+    .bind(item_id)
+    .bind(grn_id)
+    .bind(input.received_quantity)
+    .bind(input.rejected_quantity)
+    .bind(&input.batch_number)
+    .bind(&input.notes)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(item)
+}
+
+pub async fn delete_goods_receipt_item(
+    pool: &PgPool,
+    grn_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+
+    let grn = repositories::get_goods_receipt_on_conn(&mut *tx, grn_id).await?;
+    status::ensure_mutable("GOODS_RECEIPT", &grn.status)?;
+
+    // Check item belongs to this GRN
+    sqlx::query_as::<_, GoodsReceiptItem>(
+        "SELECT * FROM mm_goods_receipt_items WHERE id = $1 AND goods_receipt_id = $2",
+    )
+    .bind(item_id)
+    .bind(grn_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Goods receipt item not found".to_string()))?;
+
+    sqlx::query("DELETE FROM mm_goods_receipt_items WHERE id = $1 AND goods_receipt_id = $2")
+        .bind(item_id)
+        .bind(grn_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn list_purchase_orders(
     pool: &PgPool,
     params: &ListParams,
@@ -542,4 +797,48 @@ pub async fn receive_purchase_order(
     }
 
     Ok(updated_po)
+}
+
+/// Cancel a purchase order: DRAFT/RELEASED -> CANCELLED
+pub async fn cancel_purchase_order(
+    pool: &PgPool,
+    po_id: Uuid,
+    user_id: Uuid,
+) -> Result<PurchaseOrder, AppError> {
+    let po = repositories::get_purchase_order(pool, po_id).await?;
+    status::validate_transition(DocumentType::PurchaseOrder, &po.status, "CANCELLED")?;
+    let result = repositories::update_po_status(pool, po_id, "CANCELLED").await?;
+    status_history::record_transition(
+        pool,
+        &DocumentType::PurchaseOrder,
+        po_id,
+        Some(&po.status),
+        "CANCELLED",
+        user_id,
+        None,
+    )
+    .await?;
+    Ok(result)
+}
+
+/// Close a purchase order: PARTIALLY_RECEIVED/RECEIVED -> CLOSED
+pub async fn close_purchase_order(
+    pool: &PgPool,
+    po_id: Uuid,
+    user_id: Uuid,
+) -> Result<PurchaseOrder, AppError> {
+    let po = repositories::get_purchase_order(pool, po_id).await?;
+    status::validate_transition(DocumentType::PurchaseOrder, &po.status, "CLOSED")?;
+    let result = repositories::update_po_status(pool, po_id, "CLOSED").await?;
+    status_history::record_transition(
+        pool,
+        &DocumentType::PurchaseOrder,
+        po_id,
+        Some(&po.status),
+        "CLOSED",
+        user_id,
+        None,
+    )
+    .await?;
+    Ok(result)
 }

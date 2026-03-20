@@ -320,3 +320,47 @@ pub async fn get_cost_center_by_code(
 pub async fn next_number(pool: &PgPool, object_type: &str) -> Result<String, AppError> {
     crate::shared::number_range::next_number(pool, object_type).await
 }
+
+// --- Cost Allocation Update/Delete ---
+
+pub async fn get_cost_allocation(pool: &PgPool, id: Uuid) -> Result<CostAllocation, AppError> {
+    sqlx::query_as::<_, CostAllocation>("SELECT * FROM co_cost_allocations WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Cost allocation not found".to_string()))
+}
+
+pub async fn update_cost_allocation(
+    pool: &PgPool,
+    id: Uuid,
+    input: &UpdateCostAllocation,
+) -> Result<CostAllocation, AppError> {
+    let row = sqlx::query_as::<_, CostAllocation>(
+        r#"UPDATE co_cost_allocations SET
+            amount = COALESCE($2, amount),
+            description = COALESCE($3, description),
+            allocation_date = COALESCE($4, allocation_date)
+        WHERE id = $1
+        RETURNING *"#,
+    )
+    .bind(id)
+    .bind(input.amount)
+    .bind(&input.description)
+    .bind(input.allocation_date)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Cost allocation not found".to_string()))?;
+    Ok(row)
+}
+
+pub async fn delete_cost_allocation(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
+    let result = sqlx::query("DELETE FROM co_cost_allocations WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Cost allocation not found".to_string()));
+    }
+    Ok(())
+}

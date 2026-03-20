@@ -217,3 +217,22 @@ pub struct RecordPaymentInput {
     pub amount: Decimal,
     pub payment_date: NaiveDate,
 }
+
+// --- Journal Item CRUD (sub-table) ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddJournalItem {
+    pub account_id: Uuid,
+    pub debit_amount: Decimal,
+    pub credit_amount: Decimal,
+    pub description: Option<String>,
+    pub cost_center_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateJournalItem {
+    pub account_id: Option<Uuid>,
+    pub debit_amount: Option<Decimal>,
+    pub credit_amount: Option<Decimal>,
+    pub description: Option<String>,
+    pub cost_center_id: Option<Uuid>,
+}

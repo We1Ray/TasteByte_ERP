@@ -132,3 +132,39 @@ pub struct UpdateProductionOrderStatus {
 pub struct ConfirmProductionOrder {
     pub quantity: Decimal,
 }
+
+// --- BOM Item Sub-table CRUD ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddBomItem {
+    pub component_material_id: Uuid,
+    pub quantity: Decimal,
+    pub uom_id: Option<Uuid>,
+    pub scrap_percentage: Option<Decimal>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateBomItem {
+    pub quantity: Option<Decimal>,
+    pub uom_id: Option<Uuid>,
+    pub scrap_percentage: Option<Decimal>,
+}
+
+// --- Routing Operation Sub-table CRUD ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddRoutingOperation {
+    pub operation_number: i32,
+    #[validate(length(min = 1))]
+    pub work_center: String,
+    pub description: Option<String>,
+    pub setup_time_minutes: Option<i32>,
+    pub run_time_minutes: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateRoutingOperation {
+    pub operation_number: Option<i32>,
+    pub work_center: Option<String>,
+    pub description: Option<String>,
+    pub setup_time_minutes: Option<i32>,
+    pub run_time_minutes: Option<i32>,
+}

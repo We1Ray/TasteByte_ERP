@@ -177,6 +177,73 @@ pub async fn update_internal_order(
 }
 
 // --- Cost Allocations ---
+pub async fn get_cost_allocation(
+    State(state): State<AppState>,
+    _role: RequireRole<CoRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<CostAllocation>>, AppError> {
+    let allocation = sqlx::query_as::<_, CostAllocation>(
+        "SELECT * FROM co_cost_allocations WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Cost allocation not found".to_string()))?;
+    Ok(Json(ApiResponse::success(allocation)))
+}
+
+pub async fn update_cost_allocation(
+    State(state): State<AppState>,
+    role: RequireRole<CoWrite>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<UpdateCostAllocation>,
+) -> Result<Json<ApiResponse<CostAllocation>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let allocation = services::update_cost_allocation(&state.pool, id, input).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "co_cost_allocations",
+        id,
+        "UPDATE",
+        None,
+        serde_json::to_value(&allocation).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        allocation,
+        "Cost allocation updated",
+    )))
+}
+
+pub async fn delete_cost_allocation(
+    State(state): State<AppState>,
+    role: RequireRole<CoWrite>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_cost_allocation(&state.pool, id).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "co_cost_allocations",
+        id,
+        "DELETE",
+        None,
+        None,
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Cost allocation deleted",
+    )))
+}
+
 pub async fn list_cost_allocations(
     State(state): State<AppState>,
     _role: RequireRole<CoRead>,

@@ -353,6 +353,214 @@ pub async fn receive_purchase_order(
     )))
 }
 
+// --- Cancel Purchase Order ---
+pub async fn cancel_purchase_order(
+    State(state): State<AppState>,
+    role: RequireRole<MmWrite>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<PurchaseOrder>>, AppError> {
+    let po = services::cancel_purchase_order(&state.pool, id, role.claims.sub).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "mm_purchase_orders",
+        po.id,
+        "UPDATE",
+        None,
+        serde_json::to_value(serde_json::json!({"status": &po.status, "action": "CANCEL"})).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        po,
+        "Purchase order cancelled",
+    )))
+}
+
+// --- Close Purchase Order ---
+pub async fn close_purchase_order(
+    State(state): State<AppState>,
+    role: RequireRole<MmWrite>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<PurchaseOrder>>, AppError> {
+    let po = services::close_purchase_order(&state.pool, id, role.claims.sub).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "mm_purchase_orders",
+        po.id,
+        "UPDATE",
+        None,
+        serde_json::to_value(serde_json::json!({"status": &po.status, "action": "CLOSE"})).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        po,
+        "Purchase order closed",
+    )))
+}
+
+// --- Material Stock across Warehouses ---
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct MaterialStockEntry {
+    pub warehouse_id: Option<Uuid>,
+    pub warehouse_name: Option<String>,
+    pub quantity: rust_decimal::Decimal,
+    pub reserved_quantity: rust_decimal::Decimal,
+}
+
+pub async fn get_material_stock(
+    State(state): State<AppState>,
+    _role: RequireRole<MmRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<MaterialStockEntry>>>, AppError> {
+    // Verify material exists
+    let _ = sqlx::query("SELECT id FROM mm_materials WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Material not found".to_string()))?;
+
+    let stock = sqlx::query_as::<_, MaterialStockEntry>(
+        "SELECT ps.warehouse_id, w.name AS warehouse_name, ps.quantity, ps.reserved_quantity \
+         FROM mm_plant_stock ps \
+         LEFT JOIN wm_warehouses w ON w.id = ps.warehouse_id \
+         WHERE ps.material_id = $1 \
+         ORDER BY ps.quantity DESC",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(ApiResponse::success(stock)))
+}
+
+// --- Vendor Purchase Orders ---
+pub async fn list_vendor_purchase_orders(
+    State(state): State<AppState>,
+    _role: RequireRole<MmRead>,
+    Path(vendor_id): Path<Uuid>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<ApiResponse<PaginatedResponse<PurchaseOrder>>>, AppError> {
+    // Verify vendor exists
+    let _ = sqlx::query("SELECT id FROM mm_vendors WHERE id = $1")
+        .bind(vendor_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Vendor not found".to_string()))?;
+
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM mm_purchase_orders WHERE vendor_id = $1",
+    )
+    .bind(vendor_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let orders = sqlx::query_as::<_, PurchaseOrder>(
+        "SELECT * FROM mm_purchase_orders WHERE vendor_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+    )
+    .bind(vendor_id)
+    .bind(params.per_page())
+    .bind(params.offset())
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(ApiResponse::success(PaginatedResponse::from_list_params(orders, count, &params))))
+}
+
+// --- Purchase Order Item sub-table CRUD ---
+pub async fn add_purchase_order_item(
+    State(state): State<AppState>,
+    _role: RequireRole<MmWrite>,
+    Path(po_id): Path<Uuid>,
+    Json(input): Json<AddPurchaseOrderItem>,
+) -> Result<Json<ApiResponse<PurchaseOrderItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::add_purchase_order_item(&state.pool, po_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Purchase order item added",
+    )))
+}
+
+pub async fn update_purchase_order_item(
+    State(state): State<AppState>,
+    _role: RequireRole<MmWrite>,
+    Path((po_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdatePurchaseOrderItem>,
+) -> Result<Json<ApiResponse<PurchaseOrderItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_purchase_order_item(&state.pool, po_id, item_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Purchase order item updated",
+    )))
+}
+
+pub async fn delete_purchase_order_item(
+    State(state): State<AppState>,
+    _role: RequireRole<MmWrite>,
+    Path((po_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_purchase_order_item(&state.pool, po_id, item_id).await?;
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Purchase order item deleted",
+    )))
+}
+
+// --- Goods Receipt Item sub-table CRUD ---
+pub async fn add_goods_receipt_item(
+    State(state): State<AppState>,
+    _role: RequireRole<MmWrite>,
+    Path(grn_id): Path<Uuid>,
+    Json(input): Json<AddGoodsReceiptItem>,
+) -> Result<Json<ApiResponse<GoodsReceiptItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::add_goods_receipt_item(&state.pool, grn_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Goods receipt item added",
+    )))
+}
+
+pub async fn update_goods_receipt_item(
+    State(state): State<AppState>,
+    _role: RequireRole<MmWrite>,
+    Path((grn_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateGoodsReceiptItem>,
+) -> Result<Json<ApiResponse<GoodsReceiptItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_goods_receipt_item(&state.pool, grn_id, item_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Goods receipt item updated",
+    )))
+}
+
+pub async fn delete_goods_receipt_item(
+    State(state): State<AppState>,
+    _role: RequireRole<MmWrite>,
+    Path((grn_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_goods_receipt_item(&state.pool, grn_id, item_id).await?;
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Goods receipt item deleted",
+    )))
+}
+
 // --- Delete Material (soft delete) ---
 pub async fn delete_material(
     State(state): State<AppState>,

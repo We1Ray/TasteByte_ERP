@@ -89,6 +89,16 @@ pub struct UpdateQualityNotification {
     pub assigned_to: Option<Uuid>,
 }
 
+// --- Inspection Result Update ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateInspectionResult {
+    pub characteristic: Option<String>,
+    pub target_value: Option<String>,
+    pub actual_value: Option<String>,
+    pub is_conforming: Option<bool>,
+    pub notes: Option<String>,
+}
+
 /// Request body for completing an inspection lot.
 /// `passed` determines whether the inspected goods are accepted or rejected.
 #[derive(Debug, Deserialize, Validate)]

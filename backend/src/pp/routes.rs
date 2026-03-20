@@ -12,10 +12,26 @@ pub fn routes() -> Router<AppState> {
         .route("/boms", get(handlers::list_boms).post(handlers::create_bom))
         .route("/boms/{id}", get(handlers::get_bom))
         .route(
+            "/boms/{bom_id}/items",
+            post(handlers::add_bom_item),
+        )
+        .route(
+            "/boms/{bom_id}/items/{item_id}",
+            put(handlers::update_bom_item).delete(handlers::delete_bom_item),
+        )
+        .route(
             "/routings",
             get(handlers::list_routings).post(handlers::create_routing),
         )
         .route("/routings/{id}", get(handlers::get_routing))
+        .route(
+            "/routings/{routing_id}/operations",
+            post(handlers::add_routing_operation),
+        )
+        .route(
+            "/routings/{routing_id}/operations/{op_id}",
+            put(handlers::update_routing_operation).delete(handlers::delete_routing_operation),
+        )
         .route(
             "/production-orders",
             get(handlers::list_production_orders).post(handlers::create_production_order),

@@ -277,6 +277,84 @@ pub async fn post_journal_entry(
     )))
 }
 
+// --- Journal Entry Items (sub-table CRUD) ---
+pub async fn add_journal_item(
+    State(state): State<AppState>,
+    role: RequireRole<FiWrite>,
+    Path(je_id): Path<Uuid>,
+    Json(input): Json<AddJournalItem>,
+) -> Result<Json<ApiResponse<JournalItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::add_journal_item(&state.pool, je_id, input).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "fi_journal_items",
+        item.id,
+        "CREATE",
+        None,
+        serde_json::to_value(&item).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Journal item added",
+    )))
+}
+
+pub async fn update_journal_item(
+    State(state): State<AppState>,
+    role: RequireRole<FiWrite>,
+    Path((je_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateJournalItem>,
+) -> Result<Json<ApiResponse<JournalItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_journal_item(&state.pool, je_id, item_id, input).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "fi_journal_items",
+        item_id,
+        "UPDATE",
+        None,
+        serde_json::to_value(&item).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        item,
+        "Journal item updated",
+    )))
+}
+
+pub async fn delete_journal_item(
+    State(state): State<AppState>,
+    role: RequireRole<FiWrite>,
+    Path((je_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_journal_item(&state.pool, je_id, item_id).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "fi_journal_items",
+        item_id,
+        "DELETE",
+        None,
+        None,
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message((), "Journal item deleted")))
+}
+
 // --- AR Invoices ---
 pub async fn list_ar_invoices(
     State(state): State<AppState>,
@@ -349,6 +427,34 @@ pub async fn create_ap_invoice(
         invoice,
         "AP invoice created",
     )))
+}
+
+// --- Get AR Invoice by ID ---
+pub async fn get_ar_invoice(
+    State(state): State<AppState>,
+    _role: RequireRole<FiRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<ArInvoice>>, AppError> {
+    let invoice = sqlx::query_as::<_, ArInvoice>("SELECT * FROM fi_ar_invoices WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("AR invoice not found".to_string()))?;
+    Ok(Json(ApiResponse::success(invoice)))
+}
+
+// --- Get AP Invoice by ID ---
+pub async fn get_ap_invoice(
+    State(state): State<AppState>,
+    _role: RequireRole<FiRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<ApInvoice>>, AppError> {
+    let invoice = sqlx::query_as::<_, ApInvoice>("SELECT * FROM fi_ap_invoices WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("AP invoice not found".to_string()))?;
+    Ok(Json(ApiResponse::success(invoice)))
 }
 
 // --- AR Payment ---

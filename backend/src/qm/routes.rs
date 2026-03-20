@@ -27,6 +27,10 @@ pub fn routes() -> Router<AppState> {
             post(handlers::create_inspection_result),
         )
         .route(
+            "/inspection-results/{result_id}",
+            put(handlers::update_inspection_result).delete(handlers::delete_inspection_result),
+        )
+        .route(
             "/notifications",
             get(handlers::list_quality_notifications).post(handlers::create_quality_notification),
         )

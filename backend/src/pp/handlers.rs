@@ -48,6 +48,42 @@ pub async fn create_bom(
     Ok(Json(ApiResponse::with_message(bom, "BOM created")))
 }
 
+// --- BOM Items (sub-table CRUD) ---
+pub async fn add_bom_item(
+    State(state): State<AppState>,
+    _role: RequireRole<PpWrite>,
+    Path(bom_id): Path<Uuid>,
+    Json(input): Json<AddBomItem>,
+) -> Result<Json<ApiResponse<BomItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::add_bom_item(&state.pool, bom_id, input).await?;
+    Ok(Json(ApiResponse::with_message(item, "BOM item added")))
+}
+
+pub async fn update_bom_item(
+    State(state): State<AppState>,
+    _role: RequireRole<PpWrite>,
+    Path((bom_id, item_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateBomItem>,
+) -> Result<Json<ApiResponse<BomItem>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let item = services::update_bom_item(&state.pool, bom_id, item_id, input).await?;
+    Ok(Json(ApiResponse::with_message(item, "BOM item updated")))
+}
+
+pub async fn delete_bom_item(
+    State(state): State<AppState>,
+    _role: RequireRole<PpWrite>,
+    Path((bom_id, item_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_bom_item(&state.pool, bom_id, item_id).await?;
+    Ok(Json(ApiResponse::with_message((), "BOM item deleted")))
+}
+
 // --- Routings ---
 pub async fn list_routings(
     State(state): State<AppState>,
@@ -87,6 +123,51 @@ pub async fn create_routing(
         .map_err(|e| AppError::Validation(e.to_string()))?;
     let routing = services::create_routing(&state.pool, input).await?;
     Ok(Json(ApiResponse::with_message(routing, "Routing created")))
+}
+
+// --- Routing Operations (sub-table CRUD) ---
+pub async fn add_routing_operation(
+    State(state): State<AppState>,
+    _role: RequireRole<PpWrite>,
+    Path(routing_id): Path<Uuid>,
+    Json(input): Json<AddRoutingOperation>,
+) -> Result<Json<ApiResponse<RoutingOperation>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let op = services::add_routing_operation(&state.pool, routing_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        op,
+        "Routing operation added",
+    )))
+}
+
+pub async fn update_routing_operation(
+    State(state): State<AppState>,
+    _role: RequireRole<PpWrite>,
+    Path((routing_id, op_id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<UpdateRoutingOperation>,
+) -> Result<Json<ApiResponse<RoutingOperation>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let op = services::update_routing_operation(&state.pool, routing_id, op_id, input).await?;
+    Ok(Json(ApiResponse::with_message(
+        op,
+        "Routing operation updated",
+    )))
+}
+
+pub async fn delete_routing_operation(
+    State(state): State<AppState>,
+    _role: RequireRole<PpWrite>,
+    Path((routing_id, op_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
+    services::delete_routing_operation(&state.pool, routing_id, op_id).await?;
+    Ok(Json(ApiResponse::with_message(
+        (),
+        "Routing operation deleted",
+    )))
 }
 
 // --- Production Orders ---

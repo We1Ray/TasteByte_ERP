@@ -54,6 +54,38 @@ pub async fn create_inspection_result(
     repositories::create_inspection_result(pool, &input, user_id).await
 }
 
+// --- Inspection Result Update/Delete ---
+
+async fn ensure_lot_created_status(pool: &PgPool, lot_id: Uuid) -> Result<(), AppError> {
+    let lot = repositories::get_inspection_lot(pool, lot_id).await?;
+    if lot.status != "CREATED" {
+        return Err(AppError::Validation(format!(
+            "Inspection lot is in status '{}', must be CREATED to modify results",
+            lot.status
+        )));
+    }
+    Ok(())
+}
+
+pub async fn update_inspection_result(
+    pool: &PgPool,
+    result_id: Uuid,
+    input: UpdateInspectionResult,
+) -> Result<InspectionResult, AppError> {
+    let result = repositories::get_inspection_result(pool, result_id).await?;
+    ensure_lot_created_status(pool, result.inspection_lot_id).await?;
+    repositories::update_inspection_result(pool, result_id, &input).await
+}
+
+pub async fn delete_inspection_result(
+    pool: &PgPool,
+    result_id: Uuid,
+) -> Result<(), AppError> {
+    let result = repositories::get_inspection_result(pool, result_id).await?;
+    ensure_lot_created_status(pool, result.inspection_lot_id).await?;
+    repositories::delete_inspection_result(pool, result_id).await
+}
+
 pub async fn list_quality_notifications(
     pool: &PgPool,
     params: &ListParams,

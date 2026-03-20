@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 
@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
                 .put(handlers::update_material)
                 .delete(handlers::delete_material),
         )
+        .route("/materials/{id}/stock", get(handlers::get_material_stock))
         // Vendors
         .route(
             "/vendors",
@@ -36,6 +37,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/vendors/{id}",
             get(handlers::get_vendor).put(handlers::update_vendor),
+        )
+        .route(
+            "/vendors/{id}/purchase-orders",
+            get(handlers::list_vendor_purchase_orders),
         )
         // Plant Stock
         .route("/plant-stock", get(handlers::list_plant_stock))
@@ -51,6 +56,14 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/purchase-orders/{id}", get(handlers::get_purchase_order))
         .route(
+            "/purchase-orders/{po_id}/items",
+            post(handlers::add_purchase_order_item),
+        )
+        .route(
+            "/purchase-orders/{po_id}/items/{item_id}",
+            put(handlers::update_purchase_order_item).delete(handlers::delete_purchase_order_item),
+        )
+        .route(
             "/purchase-orders/{id}/release",
             post(handlers::release_purchase_order),
         )
@@ -58,12 +71,28 @@ pub fn routes() -> Router<AppState> {
             "/purchase-orders/{id}/receive",
             post(handlers::receive_purchase_order),
         )
+        .route(
+            "/purchase-orders/{id}/cancel",
+            post(handlers::cancel_purchase_order),
+        )
+        .route(
+            "/purchase-orders/{id}/close",
+            post(handlers::close_purchase_order),
+        )
         // Goods Receipts (GRN)
         .route(
             "/goods-receipts",
             get(handlers::list_goods_receipts).post(handlers::create_goods_receipt),
         )
         .route("/goods-receipts/{id}", get(handlers::get_goods_receipt))
+        .route(
+            "/goods-receipts/{grn_id}/items",
+            post(handlers::add_goods_receipt_item),
+        )
+        .route(
+            "/goods-receipts/{grn_id}/items/{item_id}",
+            put(handlers::update_goods_receipt_item).delete(handlers::delete_goods_receipt_item),
+        )
         .route(
             "/goods-receipts/{id}/confirm",
             post(handlers::confirm_goods_receipt),

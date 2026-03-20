@@ -263,6 +263,96 @@ async fn qm_report_notification_summary() {
 }
 
 // ---------------------------------------------------------------------------
+// QM - Inspection Result Update/Delete
+// ---------------------------------------------------------------------------
+
+/// Helper: create a material, inspection lot, and inspection result. Returns (result_id, lot_id).
+async fn create_inspection_result_helper(
+    server: &axum_test::TestServer,
+    token: &str,
+) -> (String, String) {
+    let mat_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "name": "QM Result CRUD Material",
+            "material_type": "RAW"
+        }))
+        .await;
+    let material_id = mat_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let lot_resp = server
+        .post("/api/v1/qm/inspection-lots")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "material_id": material_id,
+            "planned_quantity": "20"
+        }))
+        .await;
+    lot_resp.assert_status_ok();
+    let lot_id = lot_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let result_resp = server
+        .post("/api/v1/qm/inspection-results")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "inspection_lot_id": lot_id,
+            "characteristic": "Temperature",
+            "target_value": "25C",
+            "actual_value": "24.5C",
+            "is_conforming": true
+        }))
+        .await;
+    result_resp.assert_status_ok();
+    let result_id = result_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    (result_id, lot_id)
+}
+
+#[tokio::test]
+async fn qm_update_inspection_result() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (result_id, _lot_id) = create_inspection_result_helper(&server, &token).await;
+
+    let resp = server
+        .put(&format!("/api/v1/qm/inspection-results/{}", result_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "actual_value": "26.0C",
+            "is_conforming": false
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn qm_delete_inspection_result() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (result_id, _lot_id) = create_inspection_result_helper(&server, &token).await;
+
+    let resp = server
+        .delete(&format!("/api/v1/qm/inspection-results/{}", result_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+// ---------------------------------------------------------------------------
 // Unauthenticated access must be rejected
 // ---------------------------------------------------------------------------
 

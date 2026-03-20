@@ -261,6 +261,239 @@ async fn wm_report_transfer_summary() {
 }
 
 // ---------------------------------------------------------------------------
+// WM - Stock Count Item Sub-table CRUD
+// ---------------------------------------------------------------------------
+
+/// Helper: create a stock count with one item. Returns (sc_id, material_id).
+async fn create_stock_count_with_item(
+    server: &axum_test::TestServer,
+    token: &str,
+) -> (String, String) {
+    let unique_code = format!("SI{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
+    let wh_resp = server
+        .post("/api/v1/wm/warehouses")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "code": unique_code,
+            "name": "SC Item Test WH"
+        }))
+        .await;
+    let warehouse_id = wh_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let mat_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "name": "SC Item Test Material",
+            "material_type": "RAW"
+        }))
+        .await;
+    let material_id = mat_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let sc_resp = server
+        .post("/api/v1/wm/stock-counts")
+        .add_header(auth(token).0, auth(token).1)
+        .json(&json!({
+            "warehouse_id": warehouse_id,
+            "count_date": "2026-03-01",
+            "items": [{
+                "material_id": material_id,
+                "book_quantity": "100",
+                "counted_quantity": "98"
+            }]
+        }))
+        .await;
+    sc_resp.assert_status_ok();
+    let sc_id = sc_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    (sc_id, material_id)
+}
+
+#[tokio::test]
+async fn wm_add_stock_count_item() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (sc_id, material_id) = create_stock_count_with_item(&server, &token).await;
+
+    // Create another material for the new item
+    let mat2_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "name": "SC Item Test Material 2",
+            "material_type": "RAW"
+        }))
+        .await;
+    let material2_id = mat2_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = server
+        .post(&format!("/api/v1/wm/stock-counts/{}/items", sc_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "material_id": material2_id,
+            "book_quantity": "50",
+            "counted_quantity": "49"
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+    assert!(body["data"]["id"].is_string());
+
+    // Use material_id to suppress unused variable warning
+    let _ = material_id;
+}
+
+#[tokio::test]
+async fn wm_update_stock_count_item() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (sc_id, _material_id) = create_stock_count_with_item(&server, &token).await;
+
+    // Get stock count detail to find item_id
+    let detail_resp = server
+        .get(&format!("/api/v1/wm/stock-counts/{}", sc_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    detail_resp.assert_status_ok();
+    let detail: serde_json::Value = detail_resp.json();
+    let item_id = detail["data"]["items"][0]["id"].as_str().unwrap();
+
+    let resp = server
+        .put(&format!(
+            "/api/v1/wm/stock-counts/{}/items/{}",
+            sc_id, item_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "counted_quantity": "95",
+            "book_quantity": "100"
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn wm_delete_stock_count_item() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+    let (sc_id, _material_id) = create_stock_count_with_item(&server, &token).await;
+
+    // Add a second item so we can delete one
+    let mat2_resp = server
+        .post("/api/v1/mm/materials")
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "name": "SC Delete Test Material",
+            "material_type": "RAW"
+        }))
+        .await;
+    let material2_id = mat2_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let add_resp = server
+        .post(&format!("/api/v1/wm/stock-counts/{}/items", sc_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "material_id": material2_id,
+            "book_quantity": "30",
+            "counted_quantity": "30"
+        }))
+        .await;
+    add_resp.assert_status_ok();
+    let added_item_id = add_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = server
+        .delete(&format!(
+            "/api/v1/wm/stock-counts/{}/items/{}",
+            sc_id, added_item_id
+        ))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+}
+
+// ---------------------------------------------------------------------------
+// WM - Get Stock Transfer by ID
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn wm_get_stock_transfer() {
+    let server = common::setup_server().await;
+    let token = get_token(&server).await;
+
+    // Use seed warehouse WH-TPE as source (has stock for seed materials)
+    let from_wh_id = "f1000000-0000-0000-0000-000000000001";
+
+    // Create a destination warehouse
+    let to_code = format!("TT{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
+    let to_resp = server
+        .post("/api/v1/wm/warehouses")
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "code": to_code,
+            "name": "Transfer To WH"
+        }))
+        .await;
+    to_resp.assert_status_ok();
+    let to_wh_id = to_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Use seed material with stock at WH-TPE
+    let material_id = "b2000000-0000-0000-0000-000000000001";
+
+    // Create a stock transfer from seed warehouse
+    let create_resp = server
+        .post("/api/v1/wm/stock-transfers")
+        .add_header(auth(&token).0, auth(&token).1)
+        .json(&json!({
+            "from_warehouse_id": from_wh_id,
+            "to_warehouse_id": to_wh_id,
+            "material_id": material_id,
+            "quantity": "5"
+        }))
+        .await;
+    create_resp.assert_status_ok();
+    let transfer_id = create_resp.json::<serde_json::Value>()["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Get stock transfer by ID
+    let resp = server
+        .get(&format!("/api/v1/wm/stock-transfers/{}", transfer_id))
+        .add_header(auth(&token).0, auth(&token).1)
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    assert!(body["success"].as_bool().unwrap());
+    assert_eq!(body["data"]["id"].as_str().unwrap(), transfer_id);
+}
+
+// ---------------------------------------------------------------------------
 // Unauthenticated access must be rejected
 // ---------------------------------------------------------------------------
 

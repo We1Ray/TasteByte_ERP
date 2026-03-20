@@ -110,6 +110,14 @@ pub struct CreateCostAllocation {
     pub description: Option<String>,
 }
 
+// --- Cost Allocation Update ---
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateCostAllocation {
+    pub amount: Option<Decimal>,
+    pub description: Option<String>,
+    pub allocation_date: Option<NaiveDate>,
+}
+
 /// Input for auto-posting cost allocations from other modules.
 #[derive(Debug)]
 pub struct AutoPostCostAllocation {

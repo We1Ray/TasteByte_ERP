@@ -1,4 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, put},
+    Router,
+};
 
 use crate::co::handlers;
 use crate::co::reports;
@@ -27,6 +30,12 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/cost-allocations",
             get(handlers::list_cost_allocations).post(handlers::create_cost_allocation),
+        )
+        .route(
+            "/cost-allocations/{id}",
+            get(handlers::get_cost_allocation)
+                .put(handlers::update_cost_allocation)
+                .delete(handlers::delete_cost_allocation),
         )
         // Reports
         .route(

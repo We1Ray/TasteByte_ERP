@@ -452,3 +452,100 @@ async fn next_number_in_tx(
 pub async fn next_number(pool: &PgPool, object_type: &str) -> Result<String, AppError> {
     crate::shared::number_range::next_number(pool, object_type).await
 }
+
+// --- Stock Count Item Sub-table CRUD ---
+
+pub async fn get_stock_count_status(pool: &PgPool, sc_id: Uuid) -> Result<String, AppError> {
+    let (status,): (String,) =
+        sqlx::query_as("SELECT status FROM wm_stock_counts WHERE id = $1")
+            .bind(sc_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Stock count not found".to_string()))?;
+    Ok(status)
+}
+
+pub async fn add_stock_count_item(
+    pool: &PgPool,
+    sc_id: Uuid,
+    input: &AddStockCountItem,
+) -> Result<StockCountItem, AppError> {
+    let difference = input.counted_quantity.map(|c| c - input.book_quantity);
+    let row = sqlx::query_as::<_, StockCountItem>(
+        "INSERT INTO wm_stock_count_items (stock_count_id, material_id, storage_bin_id, book_quantity, counted_quantity, difference) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+    )
+    .bind(sc_id)
+    .bind(input.material_id)
+    .bind(input.storage_bin_id)
+    .bind(input.book_quantity)
+    .bind(input.counted_quantity)
+    .bind(difference)
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
+pub async fn update_stock_count_item(
+    pool: &PgPool,
+    sc_id: Uuid,
+    item_id: Uuid,
+    input: &UpdateStockCountItem,
+) -> Result<StockCountItem, AppError> {
+    // First get current values to compute difference
+    let current = sqlx::query_as::<_, StockCountItem>(
+        "SELECT * FROM wm_stock_count_items WHERE id = $1 AND stock_count_id = $2",
+    )
+    .bind(item_id)
+    .bind(sc_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Stock count item not found".to_string()))?;
+
+    let new_book = input.book_quantity.unwrap_or(current.book_quantity);
+    let new_counted = if input.counted_quantity.is_some() {
+        input.counted_quantity
+    } else {
+        current.counted_quantity
+    };
+    let new_difference = new_counted.map(|c| c - new_book);
+
+    let row = sqlx::query_as::<_, StockCountItem>(
+        r#"UPDATE wm_stock_count_items SET
+            material_id = COALESCE($3, material_id),
+            storage_bin_id = COALESCE($4, storage_bin_id),
+            book_quantity = $5,
+            counted_quantity = $6,
+            difference = $7
+        WHERE id = $2 AND stock_count_id = $1
+        RETURNING *"#,
+    )
+    .bind(sc_id)
+    .bind(item_id)
+    .bind(input.material_id)
+    .bind(input.storage_bin_id)
+    .bind(new_book)
+    .bind(new_counted)
+    .bind(new_difference)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Stock count item not found".to_string()))?;
+    Ok(row)
+}
+
+pub async fn delete_stock_count_item(
+    pool: &PgPool,
+    sc_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let result = sqlx::query(
+        "DELETE FROM wm_stock_count_items WHERE id = $1 AND stock_count_id = $2",
+    )
+    .bind(item_id)
+    .bind(sc_id)
+    .execute(pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Stock count item not found".to_string()));
+    }
+    Ok(())
+}

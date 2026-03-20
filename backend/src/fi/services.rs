@@ -343,6 +343,49 @@ pub async fn co_auto_post_for_journal(
     }
 }
 
+// --- Journal Item Sub-table CRUD ---
+
+fn ensure_draft_status(status: &str) -> Result<(), AppError> {
+    if status != "DRAFT" {
+        return Err(AppError::Validation(
+            "Journal entry must be in DRAFT status to modify items".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub async fn add_journal_item(
+    pool: &PgPool,
+    je_id: Uuid,
+    input: AddJournalItem,
+) -> Result<JournalItem, AppError> {
+    let status = repositories::get_journal_entry_status(pool, je_id).await?;
+    ensure_draft_status(&status)?;
+    let line_number = repositories::next_journal_item_line_number(pool, je_id).await?;
+    repositories::add_journal_item(pool, je_id, line_number, &input).await
+}
+
+pub async fn update_journal_item(
+    pool: &PgPool,
+    je_id: Uuid,
+    item_id: Uuid,
+    input: UpdateJournalItem,
+) -> Result<JournalItem, AppError> {
+    let status = repositories::get_journal_entry_status(pool, je_id).await?;
+    ensure_draft_status(&status)?;
+    repositories::update_journal_item(pool, je_id, item_id, &input).await
+}
+
+pub async fn delete_journal_item(
+    pool: &PgPool,
+    je_id: Uuid,
+    item_id: Uuid,
+) -> Result<(), AppError> {
+    let status = repositories::get_journal_entry_status(pool, je_id).await?;
+    ensure_draft_status(&status)?;
+    repositories::delete_journal_item(pool, je_id, item_id).await
+}
+
 pub async fn list_ar_invoices(
     pool: &PgPool,
     params: &ListParams,

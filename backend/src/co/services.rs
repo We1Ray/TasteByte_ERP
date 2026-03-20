@@ -93,6 +93,18 @@ pub async fn create_cost_allocation(
     repositories::create_cost_allocation(pool, &input).await
 }
 
+pub async fn update_cost_allocation(
+    pool: &PgPool,
+    id: Uuid,
+    input: UpdateCostAllocation,
+) -> Result<CostAllocation, AppError> {
+    repositories::update_cost_allocation(pool, id, &input).await
+}
+
+pub async fn delete_cost_allocation(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
+    repositories::delete_cost_allocation(pool, id).await
+}
+
 /// Auto-post a cost allocation from another module (FI, MM, PP).
 ///
 /// This is called by cross-module integration hooks to automatically create
