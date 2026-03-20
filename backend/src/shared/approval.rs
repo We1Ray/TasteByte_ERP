@@ -230,6 +230,50 @@ pub async fn process_approval(
         .find(|l| l.level_order == instance.current_level)
         .ok_or_else(|| AppError::Internal("Current level not found".to_string()))?;
 
+    // Validate approver has the correct role/identity
+    match current_level.approver_type.as_str() {
+        "USER" => {
+            if let Some(ref required_user) = current_level.approver_user_id {
+                if acted_by != *required_user {
+                    return Err(AppError::Forbidden(
+                        "You are not the designated approver for this level".to_string(),
+                    ));
+                }
+            }
+        }
+        "ROLE" => {
+            if let Some(ref required_role) = current_level.approver_role {
+                let has_role: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM lc_user_platform_roles upr JOIN lc_platform_roles pr ON pr.id = upr.role_id WHERE upr.user_id = $1 AND pr.role_name = $2)"
+                )
+                .bind(acted_by)
+                .bind(required_role)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(false);
+
+                if !has_role {
+                    // Also check ERP roles
+                    let has_erp_role: bool = sqlx::query_scalar(
+                        "SELECT EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = $1 AND r.name = $2)"
+                    )
+                    .bind(acted_by)
+                    .bind(required_role)
+                    .fetch_one(pool)
+                    .await
+                    .unwrap_or(false);
+
+                    if !has_erp_role {
+                        return Err(AppError::Forbidden(format!(
+                            "You need the '{}' role to approve at this level", required_role
+                        )));
+                    }
+                }
+            }
+        }
+        _ => {} // No restriction
+    }
+
     // Record the action
     sqlx::query("INSERT INTO approval_actions (instance_id, level_id, action, acted_by, comment) VALUES ($1,$2,$3,$4,$5)")
         .bind(instance_id)

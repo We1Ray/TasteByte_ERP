@@ -146,12 +146,27 @@ pub async fn fire_outputs(
 
         // Determine recipient
         let recipient = match rule.recipient_type.as_str() {
-            "FIELD" => data
-                .get(rule.recipient_field.as_deref().unwrap_or(""))
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            "STATIC" => rule.recipient_static.clone().unwrap_or_default(),
+            "FIELD" => {
+                let field_name = rule.recipient_field.as_deref().unwrap_or("");
+                if field_name.is_empty() {
+                    tracing::warn!("Output rule '{}': recipient_field is empty, skipping", rule.name);
+                    continue;
+                }
+                match data.get(field_name).and_then(|v| v.as_str()) {
+                    Some(v) if !v.is_empty() => v.to_string(),
+                    _ => {
+                        tracing::warn!("Output rule '{}': field '{}' not found or empty in data, skipping", rule.name, field_name);
+                        continue;
+                    }
+                }
+            }
+            "STATIC" => match &rule.recipient_static {
+                Some(v) if !v.is_empty() => v.clone(),
+                _ => {
+                    tracing::warn!("Output rule '{}': static recipient is empty, skipping", rule.name);
+                    continue;
+                }
+            },
             _ => continue,
         };
 
@@ -159,22 +174,28 @@ pub async fn fire_outputs(
         match rule.output_type.as_str() {
             "EMAIL" => {
                 if let Some(ref template_code) = rule.email_template_code {
-                    let _ = crate::shared::email::send_template_email(
+                    if let Err(e) = crate::shared::email::send_template_email(
                         pool,
                         template_code,
                         &recipient,
                         data,
                     )
-                    .await;
+                    .await
+                    {
+                        tracing::warn!("Output rule '{}': email send failed: {}", rule.name, e);
+                    }
                 }
             }
             "NOTIFICATION" => {
-                let _ = sqlx::query("INSERT INTO lc_notifications (user_id, title, message, notification_type) VALUES ($1, $2, $3, 'OUTPUT')")
+                if let Err(e) = sqlx::query("INSERT INTO lc_notifications (user_id, title, message, notification_type) VALUES ($1, $2, $3, 'OUTPUT')")
                     .bind(uuid::Uuid::parse_str(&recipient).ok())
                     .bind(&rule.name)
                     .bind(format!("Output triggered for record {}", record_id))
                     .execute(pool)
-                    .await;
+                    .await
+                {
+                    tracing::warn!("Output rule '{}': notification failed: {}", rule.name, e);
+                }
             }
             _ => {}
         }
