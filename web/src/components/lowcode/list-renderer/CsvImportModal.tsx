@@ -240,6 +240,26 @@ export function CsvImportModal({
               {t("chooseFile")}
             </span>
           </label>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const { importTemplateApi } = await import("@/lib/api/system");
+                  const blob = await importTemplateApi.download(operationCode);
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${operationCode}_template.csv`;
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                } catch { /* ignore */ }
+              }}
+              className="text-sm text-blue-600 hover:text-blue-700 underline"
+            >
+              {t("downloadTemplate")}
+            </button>
+          </div>
         </div>
       )}
 

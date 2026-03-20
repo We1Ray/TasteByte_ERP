@@ -239,14 +239,51 @@ pub async fn create_data(
         ));
     }
 
+    // Cross-field validation
+    let cf_rules =
+        crate::shared::cross_field::list_rules(&state.pool, operation.id).await?;
+    if !cf_rules.is_empty() {
+        let cf_errors = crate::shared::cross_field::validate_cross_field_rules(
+            &cf_rules,
+            &validation.prepared_data,
+        );
+        if !cf_errors.is_empty() {
+            return Err(AppError::Validation(
+                serde_json::to_string(&cf_errors)
+                    .unwrap_or_else(|_| "Cross-field validation failed".to_string()),
+            ));
+        }
+    }
+
+    // Apply calculation formulas
+    let formulas =
+        crate::shared::cross_field::list_formulas(&state.pool, operation.id).await?;
+    let insert_data = if !formulas.is_empty() {
+        let mut prepared = validation.prepared_data.clone();
+        crate::shared::cross_field::apply_formulas(&formulas, &mut prepared);
+        prepared
+    } else {
+        validation.prepared_data.clone()
+    };
+
     let record = sqlx::query_as::<_, OperationData>(
         "INSERT INTO lc_operation_data (operation_id, data, created_by) VALUES ($1, $2, $3) RETURNING *",
     )
     .bind(operation.id)
-    .bind(&validation.prepared_data)
+    .bind(&insert_data)
     .bind(guard.claims.sub)
     .fetch_one(&state.pool)
     .await?;
+
+    // Fire output determination rules
+    crate::shared::output_determination::fire_outputs(
+        &state.pool,
+        operation.id,
+        record.id,
+        "ON_CREATE",
+        &record.data,
+    )
+    .await;
 
     // Audit log
     if let Err(e) = crate::shared::audit::log_change(
@@ -255,7 +292,7 @@ pub async fn create_data(
         record.id,
         "INSERT",
         None,
-        Some(validation.prepared_data),
+        Some(insert_data),
         Some(guard.claims.sub),
     )
     .await
@@ -381,15 +418,52 @@ pub async fn update_data(
         ));
     }
 
+    // Cross-field validation
+    let cf_rules =
+        crate::shared::cross_field::list_rules(&state.pool, operation.id).await?;
+    if !cf_rules.is_empty() {
+        let cf_errors = crate::shared::cross_field::validate_cross_field_rules(
+            &cf_rules,
+            &validation.prepared_data,
+        );
+        if !cf_errors.is_empty() {
+            return Err(AppError::Validation(
+                serde_json::to_string(&cf_errors)
+                    .unwrap_or_else(|_| "Cross-field validation failed".to_string()),
+            ));
+        }
+    }
+
+    // Apply calculation formulas
+    let formulas =
+        crate::shared::cross_field::list_formulas(&state.pool, operation.id).await?;
+    let update_data = if !formulas.is_empty() {
+        let mut prepared = validation.prepared_data.clone();
+        crate::shared::cross_field::apply_formulas(&formulas, &mut prepared);
+        prepared
+    } else {
+        validation.prepared_data.clone()
+    };
+
     let record = sqlx::query_as::<_, OperationData>(
         "UPDATE lc_operation_data SET data = $3, updated_at = NOW() WHERE id = $1 AND operation_id = $2 RETURNING *",
     )
     .bind(id)
     .bind(operation.id)
-    .bind(&validation.prepared_data)
+    .bind(&update_data)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("Record not found".to_string()))?;
+
+    // Fire output determination rules
+    crate::shared::output_determination::fire_outputs(
+        &state.pool,
+        operation.id,
+        record.id,
+        "ON_UPDATE",
+        &record.data,
+    )
+    .await;
 
     // Audit log
     if let Err(e) = crate::shared::audit::log_change(
@@ -398,7 +472,7 @@ pub async fn update_data(
         record.id,
         "UPDATE",
         Some(old_record.data),
-        Some(validation.prepared_data),
+        Some(update_data),
         Some(guard.claims.sub),
     )
     .await

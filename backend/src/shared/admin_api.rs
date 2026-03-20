@@ -3,7 +3,7 @@ use axum::Json;
 use uuid::Uuid;
 
 use crate::shared::types::{AppState, Claims};
-use crate::shared::{email, print_layout, scheduler, webhook};
+use crate::shared::{analytics, approval, auth_trace, bpm, cross_field, email, exchange_rate, output_determination, print_layout, report_builder, scheduler, webhook};
 use crate::shared::{ApiResponse, AppError};
 
 // -- User Preferences -------------------------------------------------------
@@ -551,4 +551,609 @@ pub async fn create_transport_order(
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(ApiResponse::success(order)))
+}
+
+// -- Approval Matrix ---------------------------------------------------------
+
+pub async fn list_approval_matrices(
+    State(state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Json<ApiResponse<Vec<approval::ApprovalMatrix>>>, AppError> {
+    let op_id = params
+        .get("operation_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let matrices = approval::list_matrices(&state.pool, op_id).await?;
+    Ok(Json(ApiResponse::success(matrices)))
+}
+
+pub async fn create_approval_matrix(
+    State(state): State<AppState>,
+    Json(input): Json<approval::CreateApprovalMatrix>,
+) -> Result<Json<ApiResponse<approval::ApprovalMatrixWithLevels>>, AppError> {
+    let result = approval::create_matrix(&state.pool, input).await?;
+    Ok(Json(ApiResponse::success(result)))
+}
+
+pub async fn get_approval_matrix(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<approval::ApprovalMatrixWithLevels>>, AppError> {
+    let result = approval::get_matrix_with_levels(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(result)))
+}
+
+pub async fn delete_approval_matrix(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    approval::delete_matrix(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": true}),
+    )))
+}
+
+pub async fn submit_for_approval(
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(input): Json<serde_json::Value>,
+) -> Result<Json<ApiResponse<approval::ApprovalInstance>>, AppError> {
+    let matrix_id = input
+        .get("matrix_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| AppError::Validation("matrix_id required".to_string()))?;
+    let operation_id = input
+        .get("operation_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| AppError::Validation("operation_id required".to_string()))?;
+    let record_id = input
+        .get("record_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| AppError::Validation("record_id required".to_string()))?;
+    let instance = approval::submit_for_approval(
+        &state.pool,
+        matrix_id,
+        operation_id,
+        record_id,
+        claims.sub,
+    )
+    .await?;
+    Ok(Json(ApiResponse::success(instance)))
+}
+
+pub async fn process_approval_action(
+    State(state): State<AppState>,
+    claims: Claims,
+    Path(id): Path<Uuid>,
+    Json(input): Json<serde_json::Value>,
+) -> Result<Json<ApiResponse<approval::ApprovalInstance>>, AppError> {
+    let action = input
+        .get("action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("APPROVE");
+    let comment = input.get("comment").and_then(|v| v.as_str());
+    let instance =
+        approval::process_approval(&state.pool, id, action, claims.sub, comment).await?;
+    Ok(Json(ApiResponse::success(instance)))
+}
+
+pub async fn get_approval_instance(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    let (instance, actions) = approval::get_instance_with_actions(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({ "instance": instance, "actions": actions }),
+    )))
+}
+
+pub async fn list_pending_approvals(
+    State(state): State<AppState>,
+    claims: Claims,
+) -> Result<Json<ApiResponse<Vec<approval::ApprovalInstance>>>, AppError> {
+    let instances = approval::list_pending_approvals(&state.pool, claims.sub).await?;
+    Ok(Json(ApiResponse::success(instances)))
+}
+
+// -- BPM Workflows -----------------------------------------------------------
+
+pub async fn list_workflows(
+    State(state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Json<ApiResponse<Vec<bpm::WorkflowDefinition>>>, AppError> {
+    let op_id = params
+        .get("operation_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let defs = bpm::list_definitions(&state.pool, op_id).await?;
+    Ok(Json(ApiResponse::success(defs)))
+}
+
+pub async fn create_workflow(
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(input): Json<bpm::CreateWorkflowDefinition>,
+) -> Result<Json<ApiResponse<bpm::WorkflowDefinition>>, AppError> {
+    let def = bpm::create_definition(&state.pool, input, claims.sub).await?;
+    Ok(Json(ApiResponse::success(def)))
+}
+
+pub async fn update_workflow(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<bpm::CreateWorkflowDefinition>,
+) -> Result<Json<ApiResponse<bpm::WorkflowDefinition>>, AppError> {
+    let def = bpm::update_definition(&state.pool, id, input).await?;
+    Ok(Json(ApiResponse::success(def)))
+}
+
+pub async fn delete_workflow(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    bpm::delete_definition(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": true}),
+    )))
+}
+
+pub async fn start_workflow(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<serde_json::Value>,
+) -> Result<Json<ApiResponse<bpm::WorkflowInstance>>, AppError> {
+    let op_id = input
+        .get("operation_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| AppError::Validation("operation_id required".to_string()))?;
+    let record_id = input
+        .get("record_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| AppError::Validation("record_id required".to_string()))?;
+    let instance = bpm::start_instance(&state.pool, id, op_id, record_id).await?;
+    Ok(Json(ApiResponse::success(instance)))
+}
+
+pub async fn advance_workflow(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<serde_json::Value>,
+) -> Result<Json<ApiResponse<bpm::WorkflowInstance>>, AppError> {
+    let target = input
+        .get("target_node")
+        .and_then(|v| v.as_str())
+        .unwrap_or("next");
+    let instance = bpm::advance_instance(&state.pool, id, target).await?;
+    Ok(Json(ApiResponse::success(instance)))
+}
+
+pub async fn list_workflow_instances(
+    State(state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Json<ApiResponse<Vec<bpm::WorkflowInstance>>>, AppError> {
+    let op_id = params
+        .get("operation_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| AppError::Validation("operation_id required".to_string()))?;
+    let instances = bpm::list_instances(&state.pool, op_id).await?;
+    Ok(Json(ApiResponse::success(instances)))
+}
+
+pub async fn get_workflow_logs(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<bpm::WorkflowExecLog>>>, AppError> {
+    let logs = bpm::get_instance_logs(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(logs)))
+}
+
+// -- Cross-field Rules & Formulas --------------------------------------------
+
+pub async fn list_cross_field_rules(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<cross_field::CrossFieldRule>>>, AppError> {
+    let rules = cross_field::list_rules(&state.pool, operation_id).await?;
+    Ok(Json(ApiResponse::success(rules)))
+}
+
+pub async fn create_cross_field_rule(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+    Json(input): Json<cross_field::CreateCrossFieldRule>,
+) -> Result<Json<ApiResponse<cross_field::CrossFieldRule>>, AppError> {
+    let rule = cross_field::create_rule(&state.pool, operation_id, input).await?;
+    Ok(Json(ApiResponse::success(rule)))
+}
+
+pub async fn delete_cross_field_rule(
+    State(state): State<AppState>,
+    Path((_operation_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    cross_field::delete_rule(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": true}),
+    )))
+}
+
+pub async fn list_formulas(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<cross_field::CalculationFormula>>>, AppError> {
+    let formulas = cross_field::list_formulas(&state.pool, operation_id).await?;
+    Ok(Json(ApiResponse::success(formulas)))
+}
+
+pub async fn create_formula(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+    Json(input): Json<cross_field::CreateCalculationFormula>,
+) -> Result<Json<ApiResponse<cross_field::CalculationFormula>>, AppError> {
+    let formula = cross_field::create_formula(&state.pool, operation_id, input).await?;
+    Ok(Json(ApiResponse::success(formula)))
+}
+
+pub async fn delete_formula(
+    State(state): State<AppState>,
+    Path((_operation_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    cross_field::delete_formula(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": true}),
+    )))
+}
+
+// -- Output Determination ----------------------------------------------------
+
+pub async fn list_output_rules(
+    State(state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Json<ApiResponse<Vec<output_determination::OutputRule>>>, AppError> {
+    let op_id = params
+        .get("operation_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let rules = output_determination::list_rules(&state.pool, op_id).await?;
+    Ok(Json(ApiResponse::success(rules)))
+}
+
+pub async fn create_output_rule(
+    State(state): State<AppState>,
+    Json(input): Json<output_determination::CreateOutputRule>,
+) -> Result<Json<ApiResponse<output_determination::OutputRule>>, AppError> {
+    let rule = output_determination::create_rule(&state.pool, input).await?;
+    Ok(Json(ApiResponse::success(rule)))
+}
+
+pub async fn delete_output_rule(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    output_determination::delete_rule(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": true}),
+    )))
+}
+
+pub async fn list_output_logs(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<output_determination::OutputLog>>>, AppError> {
+    let logs = output_determination::list_logs(&state.pool, operation_id).await?;
+    Ok(Json(ApiResponse::success(logs)))
+}
+
+// -- Number Range Config -----------------------------------------------------
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct NumberRangeConfig {
+    pub id: Uuid,
+    pub range_prefix: String,
+    pub description: Option<String>,
+    pub current_value: i64,
+    pub start_value: i64,
+    pub end_value: i64,
+    pub padding: i32,
+    pub separator: String,
+    pub fiscal_year_dependent: bool,
+    pub is_active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub async fn list_number_ranges(
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<NumberRangeConfig>>>, AppError> {
+    let ranges = sqlx::query_as::<_, NumberRangeConfig>(
+        "SELECT * FROM number_range_config ORDER BY range_prefix",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(ApiResponse::success(ranges)))
+}
+
+pub async fn update_number_range(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<serde_json::Value>,
+) -> Result<Json<ApiResponse<NumberRangeConfig>>, AppError> {
+    let desc = input.get("description").and_then(|v| v.as_str());
+    let padding = input
+        .get("padding")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i32);
+    let separator = input.get("separator").and_then(|v| v.as_str());
+    let fiscal = input
+        .get("fiscal_year_dependent")
+        .and_then(|v| v.as_bool());
+    let active = input.get("is_active").and_then(|v| v.as_bool());
+
+    let range = sqlx::query_as::<_, NumberRangeConfig>(
+        "UPDATE number_range_config SET description = COALESCE($2, description), padding = COALESCE($3, padding), separator = COALESCE($4, separator), fiscal_year_dependent = COALESCE($5, fiscal_year_dependent), is_active = COALESCE($6, is_active), updated_at = NOW() WHERE id = $1 RETURNING *",
+    )
+    .bind(id)
+    .bind(desc)
+    .bind(padding)
+    .bind(separator)
+    .bind(fiscal)
+    .bind(active)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Number range not found".to_string()))?;
+    Ok(Json(ApiResponse::success(range)))
+}
+
+// -- Auth Trace --------------------------------------------------------------
+
+pub async fn get_auth_trace(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<auth_trace::AuthTraceEntry>>>, AppError> {
+    let entries = auth_trace::get_user_trace(&state.pool, user_id, 50).await?;
+    Ok(Json(ApiResponse::success(entries)))
+}
+
+pub async fn get_auth_denials(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<auth_trace::AuthTraceEntry>>>, AppError> {
+    let entries = auth_trace::get_recent_denials(&state.pool, user_id).await?;
+    Ok(Json(ApiResponse::success(entries)))
+}
+
+// -- Form Variants -----------------------------------------------------------
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct FormVariant {
+    pub id: Uuid,
+    pub operation_id: Uuid,
+    pub variant_name: String,
+    pub condition_field: Option<String>,
+    pub condition_value: Option<String>,
+    pub hidden_fields: Vec<String>,
+    pub readonly_fields: Vec<String>,
+    pub required_fields: Vec<String>,
+    pub default_values: serde_json::Value,
+    pub layout_overrides: serde_json::Value,
+    pub is_default: bool,
+    pub sort_order: i32,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateFormVariant {
+    pub variant_name: String,
+    pub condition_field: Option<String>,
+    pub condition_value: Option<String>,
+    pub hidden_fields: Option<Vec<String>>,
+    pub readonly_fields: Option<Vec<String>>,
+    pub required_fields: Option<Vec<String>>,
+    pub default_values: Option<serde_json::Value>,
+    pub layout_overrides: Option<serde_json::Value>,
+    pub is_default: Option<bool>,
+}
+
+pub async fn list_form_variants(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<FormVariant>>>, AppError> {
+    let variants = sqlx::query_as::<_, FormVariant>(
+        "SELECT * FROM form_variants WHERE operation_id = $1 ORDER BY sort_order",
+    )
+    .bind(operation_id)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(ApiResponse::success(variants)))
+}
+
+pub async fn create_form_variant(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+    Json(input): Json<CreateFormVariant>,
+) -> Result<Json<ApiResponse<FormVariant>>, AppError> {
+    let variant = sqlx::query_as::<_, FormVariant>(
+        "INSERT INTO form_variants (operation_id, variant_name, condition_field, condition_value, hidden_fields, readonly_fields, required_fields, default_values, layout_overrides, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *",
+    )
+    .bind(operation_id)
+    .bind(&input.variant_name)
+    .bind(&input.condition_field)
+    .bind(&input.condition_value)
+    .bind(input.hidden_fields.as_deref().unwrap_or(&[]))
+    .bind(input.readonly_fields.as_deref().unwrap_or(&[]))
+    .bind(input.required_fields.as_deref().unwrap_or(&[]))
+    .bind(
+        input
+            .default_values
+            .as_ref()
+            .unwrap_or(&serde_json::json!({})),
+    )
+    .bind(
+        input
+            .layout_overrides
+            .as_ref()
+            .unwrap_or(&serde_json::json!({})),
+    )
+    .bind(input.is_default.unwrap_or(false))
+    .fetch_one(&state.pool)
+    .await?;
+    Ok(Json(ApiResponse::success(variant)))
+}
+
+pub async fn delete_form_variant(
+    State(state): State<AppState>,
+    Path((_operation_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    sqlx::query("DELETE FROM form_variants WHERE id = $1")
+        .bind(id)
+        .execute(&state.pool)
+        .await?;
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": true}),
+    )))
+}
+
+// -- Import Template Download ------------------------------------------------
+
+pub async fn download_import_template(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+) -> Result<axum::response::Response, AppError> {
+    use axum::http::header;
+    use axum::response::IntoResponse;
+
+    let operation = sqlx::query_as::<_, crate::lowcode::models::Operation>(
+        "SELECT * FROM lc_operations WHERE operation_code = $1",
+    )
+    .bind(&code)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Operation not found".to_string()))?;
+
+    let form =
+        crate::lowcode::services::form_builder::get_form(&state.pool, operation.id).await?;
+    let fields: Vec<_> = form
+        .sections
+        .iter()
+        .flat_map(|s| s.fields.iter())
+        .collect();
+
+    let mut wtr = csv::Writer::from_writer(Vec::new());
+
+    // Header row: field labels
+    let headers: Vec<String> = fields.iter().map(|f| f.field.field_label.clone()).collect();
+    wtr.write_record(&headers)
+        .map_err(|e| AppError::Internal(format!("CSV: {}", e)))?;
+
+    // Second row: field keys (for mapping reference)
+    let keys: Vec<String> = fields.iter().map(|f| f.field.field_name.clone()).collect();
+    wtr.write_record(&keys)
+        .map_err(|e| AppError::Internal(format!("CSV: {}", e)))?;
+
+    // Third row: example/hints
+    let hints: Vec<String> = fields
+        .iter()
+        .map(|f| {
+            let mut hint = format!("[{}]", f.field.field_type);
+            if f.field.is_required {
+                hint.push_str(" *Required");
+            }
+            if let Some(ref dv) = f.field.default_value {
+                hint.push_str(&format!(" Default:{}", dv));
+            }
+            hint
+        })
+        .collect();
+    wtr.write_record(&hints)
+        .map_err(|e| AppError::Internal(format!("CSV: {}", e)))?;
+
+    let csv_bytes = wtr
+        .into_inner()
+        .map_err(|e| AppError::Internal(format!("CSV: {}", e)))?;
+    let filename = format!("{}_import_template.csv", code);
+
+    Ok((
+        [
+            (
+                header::CONTENT_TYPE,
+                "text/csv; charset=utf-8".to_string(),
+            ),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{}\"", filename),
+            ),
+        ],
+        csv_bytes,
+    )
+        .into_response())
+}
+
+// ── Reports ────────────────────────────────────────────────────────
+pub async fn list_reports(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<report_builder::ReportDefinition>>>, AppError> {
+    Ok(Json(ApiResponse::success(report_builder::list_reports(&state.pool).await?)))
+}
+pub async fn get_report(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<ApiResponse<report_builder::ReportDefinition>>, AppError> {
+    Ok(Json(ApiResponse::success(report_builder::get_report(&state.pool, id).await?)))
+}
+pub async fn create_report(State(state): State<AppState>, claims: Claims, Json(input): Json<report_builder::CreateReport>) -> Result<Json<ApiResponse<report_builder::ReportDefinition>>, AppError> {
+    Ok(Json(ApiResponse::success(report_builder::create_report(&state.pool, input, claims.sub).await?)))
+}
+pub async fn delete_report(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    report_builder::delete_report(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(serde_json::json!({"deleted":true}))))
+}
+
+// ── Analytics ──────────────────────────────────────────────────────
+pub async fn track_analytics_event(State(state): State<AppState>, claims: Claims, Json(input): Json<analytics::TrackEvent>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    analytics::track_event(&state.pool, claims.sub, input).await?;
+    Ok(Json(ApiResponse::success(serde_json::json!({"tracked":true}))))
+}
+pub async fn get_analytics_summary(State(state): State<AppState>, Query(params): Query<serde_json::Value>) -> Result<Json<ApiResponse<Vec<analytics::UsageSummary>>>, AppError> {
+    let days = params.get("days").and_then(|v| v.as_i64()).unwrap_or(30) as i32;
+    Ok(Json(ApiResponse::success(analytics::get_summary(&state.pool, days).await?)))
+}
+pub async fn get_operation_analytics(State(state): State<AppState>, Path(operation_id): Path<Uuid>) -> Result<Json<ApiResponse<Vec<analytics::UsageSummary>>>, AppError> {
+    Ok(Json(ApiResponse::success(analytics::get_operation_stats(&state.pool, operation_id).await?)))
+}
+
+// ── Dashboard Templates ────────────────────────────────────────────
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+pub struct DashboardTemplate {
+    pub id: Uuid,
+    pub template_code: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: String,
+    pub definition: serde_json::Value,
+    pub is_active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+pub async fn list_dashboard_templates(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<DashboardTemplate>>>, AppError> {
+    Ok(Json(ApiResponse::success(sqlx::query_as::<_, DashboardTemplate>("SELECT * FROM dashboard_templates WHERE is_active=true ORDER BY category,name").fetch_all(&state.pool).await?)))
+}
+
+// ── Exchange Rates ─────────────────────────────────────────────────
+pub async fn list_exchange_rates(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<exchange_rate::ExchangeRate>>>, AppError> {
+    Ok(Json(ApiResponse::success(exchange_rate::list_rates(&state.pool).await?)))
+}
+pub async fn create_exchange_rate(State(state): State<AppState>, Json(input): Json<exchange_rate::CreateExchangeRate>) -> Result<Json<ApiResponse<exchange_rate::ExchangeRate>>, AppError> {
+    Ok(Json(ApiResponse::success(exchange_rate::create_rate(&state.pool, input).await?)))
+}
+pub async fn delete_exchange_rate(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    exchange_rate::delete_rate(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(serde_json::json!({"deleted":true}))))
+}
+pub async fn convert_currency(State(state): State<AppState>, Query(params): Query<serde_json::Value>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    let from = params.get("from").and_then(|v| v.as_str()).unwrap_or("USD");
+    let to = params.get("to").and_then(|v| v.as_str()).unwrap_or("TWD");
+    let amount: rust_decimal::Decimal = params.get("amount").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(rust_decimal::Decimal::ONE);
+    let date = chrono::Utc::now().date_naive();
+    let result = exchange_rate::convert(&state.pool, from, to, amount, date).await?;
+    Ok(Json(ApiResponse::success(serde_json::json!({"from":from,"to":to,"amount":amount.to_string(),"result":result.to_string(),"date":date.to_string()}))))
 }

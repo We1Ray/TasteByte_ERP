@@ -317,4 +317,132 @@ fn system_routes() -> Router<AppState> {
             "/transports",
             get(admin_api::list_transport_orders).post(admin_api::create_transport_order),
         )
+        // Approval Matrix
+        .route(
+            "/approvals/matrices",
+            get(admin_api::list_approval_matrices).post(admin_api::create_approval_matrix),
+        )
+        .route(
+            "/approvals/matrices/{id}",
+            get(admin_api::get_approval_matrix).delete(admin_api::delete_approval_matrix),
+        )
+        .route("/approvals/submit", post(admin_api::submit_for_approval))
+        .route(
+            "/approvals/instances/{id}/action",
+            post(admin_api::process_approval_action),
+        )
+        .route(
+            "/approvals/instances/{id}",
+            get(admin_api::get_approval_instance),
+        )
+        .route("/approvals/pending", get(admin_api::list_pending_approvals))
+        // BPM Workflows
+        .route(
+            "/workflows",
+            get(admin_api::list_workflows).post(admin_api::create_workflow),
+        )
+        .route(
+            "/workflows/{id}",
+            put(admin_api::update_workflow).delete(admin_api::delete_workflow),
+        )
+        .route("/workflows/{id}/start", post(admin_api::start_workflow))
+        .route(
+            "/workflows/instances/{id}/advance",
+            post(admin_api::advance_workflow),
+        )
+        .route(
+            "/workflows/instances",
+            get(admin_api::list_workflow_instances),
+        )
+        .route(
+            "/workflows/instances/{id}/logs",
+            get(admin_api::get_workflow_logs),
+        )
+        // Cross-field Rules & Formulas
+        .route(
+            "/rules/{operation_id}",
+            get(admin_api::list_cross_field_rules).post(admin_api::create_cross_field_rule),
+        )
+        .route(
+            "/rules/{operation_id}/{id}",
+            delete(admin_api::delete_cross_field_rule),
+        )
+        .route(
+            "/formulas/{operation_id}",
+            get(admin_api::list_formulas).post(admin_api::create_formula),
+        )
+        .route(
+            "/formulas/{operation_id}/{id}",
+            delete(admin_api::delete_formula),
+        )
+        // Output Determination
+        .route(
+            "/outputs",
+            get(admin_api::list_output_rules).post(admin_api::create_output_rule),
+        )
+        .route("/outputs/{id}", delete(admin_api::delete_output_rule))
+        .route(
+            "/outputs/logs/{operation_id}",
+            get(admin_api::list_output_logs),
+        )
+        // Number Range Config
+        .route("/number-ranges", get(admin_api::list_number_ranges))
+        .route(
+            "/number-ranges/{id}",
+            put(admin_api::update_number_range),
+        )
+        // Auth Trace
+        .route(
+            "/auth-trace/{user_id}",
+            get(admin_api::get_auth_trace),
+        )
+        .route(
+            "/auth-trace/{user_id}/denials",
+            get(admin_api::get_auth_denials),
+        )
+        // Form Variants
+        .route(
+            "/form-variants/{operation_id}",
+            get(admin_api::list_form_variants).post(admin_api::create_form_variant),
+        )
+        .route(
+            "/form-variants/{operation_id}/{id}",
+            delete(admin_api::delete_form_variant),
+        )
+        // Import Template
+        .route(
+            "/import-template/{code}",
+            get(admin_api::download_import_template),
+        )
+        // Reports
+        .route(
+            "/reports",
+            get(admin_api::list_reports).post(admin_api::create_report),
+        )
+        .route(
+            "/reports/{id}",
+            get(admin_api::get_report).delete(admin_api::delete_report),
+        )
+        // Analytics
+        .route("/analytics/track", post(admin_api::track_analytics_event))
+        .route("/analytics/summary", get(admin_api::get_analytics_summary))
+        .route(
+            "/analytics/operation/{operation_id}",
+            get(admin_api::get_operation_analytics),
+        )
+        // Dashboard Templates
+        .route(
+            "/dashboard-templates",
+            get(admin_api::list_dashboard_templates),
+        )
+        // Exchange Rates
+        .route(
+            "/exchange-rates",
+            get(admin_api::list_exchange_rates).post(admin_api::create_exchange_rate),
+        )
+        .route(
+            "/exchange-rates/{id}",
+            delete(admin_api::delete_exchange_rate),
+        )
+        .route("/exchange-rates/convert", get(admin_api::convert_currency))
 }
