@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useCallback } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
@@ -10,6 +11,7 @@ import { DynamicTabs } from "./DynamicTabs";
 import { WizardForm } from "./WizardForm";
 import { buildFormSchema, getDefaultValues } from "./schema-builder";
 import { useDynamicForm } from "@/lib/hooks/use-dynamic-form";
+import { useFormCalculations } from "@/lib/hooks/use-form-calculations";
 import type { FormSection } from "@/lib/types/lowcode";
 
 interface DynamicFormProps {
@@ -33,8 +35,9 @@ export function DynamicForm({
 }: DynamicFormProps) {
   const t = useTranslations("lowcode");
   const tCommon = useTranslations("common");
-  const { formDefinition, isLoading, createRecord, updateRecord, isSubmitting } =
+  const { formDefinition, formulas, isLoading, createRecord, updateRecord, isSubmitting } =
     useDynamicForm(operationCode);
+  const { calculate } = useFormCalculations(formulas);
 
   const sections = previewSections || formDefinition?.sections || [];
   const sortedSections = [...sections].sort((a, b) => a.sort_order - b.sort_order);
@@ -53,6 +56,51 @@ export function DynamicForm({
     defaultValues: defaults,
     values: initialData,
   });
+
+  // Track the previous form values to detect which field changed
+  const prevValuesRef = useRef<Record<string, unknown>>({});
+
+  const applyCalculations = useCallback(
+    (currentValues: Record<string, unknown>) => {
+      if (formulas.length === 0) return;
+      const prev = prevValuesRef.current;
+      // Find which fields changed
+      const changedFields: string[] = [];
+      for (const key of Object.keys(currentValues)) {
+        if (currentValues[key] !== prev[key]) {
+          changedFields.push(key);
+        }
+      }
+      prevValuesRef.current = { ...currentValues };
+      if (changedFields.length === 0) return;
+
+      // Accumulate all calculation updates
+      const allUpdates: Record<string, unknown> = {};
+      for (const fieldName of changedFields) {
+        const updates = calculate(fieldName, currentValues);
+        Object.assign(allUpdates, updates);
+      }
+      // Apply updates via setValue (does not trigger re-subscription for these fields if value is same)
+      for (const [key, value] of Object.entries(allUpdates)) {
+        const current = currentValues[key];
+        if (current !== value) {
+          methods.setValue(key, value, { shouldDirty: true, shouldValidate: true });
+        }
+      }
+    },
+    [formulas, calculate, methods]
+  );
+
+  // Subscribe to form value changes for real-time calculation
+  useEffect(() => {
+    if (formulas.length === 0) return;
+    // Initialize prevValues with current form values
+    prevValuesRef.current = { ...methods.getValues() };
+    const subscription = methods.watch((values) => {
+      applyCalculations(values as Record<string, unknown>);
+    });
+    return () => subscription.unsubscribe();
+  }, [formulas, methods, applyCalculations]);
 
   const handleSubmit = methods.handleSubmit(async (data) => {
     if (onTestSubmit) {

@@ -65,6 +65,21 @@ pub async fn validate_for_create(
             continue;
         }
 
+        // Conditional required check
+        if let Some(ref req_rule) = field.required_rule {
+            let is_empty = value.is_none()
+                || value == Some(&Value::Null)
+                || value == Some(&Value::String(String::new()));
+            if is_empty && should_require_field(req_rule, &Value::Object(prepared.clone())) {
+                errors.push(FieldError {
+                    field_name: field_name.clone(),
+                    field_label: field_label.clone(),
+                    message: format!("{} is conditionally required", field_label),
+                });
+                continue;
+            }
+        }
+
         let val = match value {
             Some(v) if !v.is_null() => v,
             _ => continue,
@@ -157,6 +172,21 @@ pub async fn validate_for_update(
             continue;
         }
 
+        // Conditional required check
+        if let Some(ref req_rule) = field.required_rule {
+            let is_empty = value.is_none()
+                || value == Some(&Value::Null)
+                || value == Some(&Value::String(String::new()));
+            if is_empty && should_require_field(req_rule, &Value::Object(prepared.clone())) {
+                errors.push(FieldError {
+                    field_name: field_name.clone(),
+                    field_label: field_label.clone(),
+                    message: format!("{} is conditionally required", field_label),
+                });
+                continue;
+            }
+        }
+
         let val = match value {
             Some(v) if !v.is_null() => v,
             _ => continue,
@@ -194,6 +224,52 @@ pub async fn validate_for_update(
         errors,
         prepared_data: Value::Object(prepared),
     })
+}
+
+/// Check if a field should be required based on a conditional rule.
+/// Returns true when the condition is met and the field should be required.
+fn should_require_field(rule: &Value, data: &Value) -> bool {
+    let rule = match rule {
+        Value::Object(_) => rule,
+        _ => return false,
+    };
+
+    let dependent_field = rule
+        .get("dependent_field")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let operator = rule
+        .get("operator")
+        .and_then(|v| v.as_str())
+        .unwrap_or("equals");
+    let expected = rule.get("value");
+
+    if dependent_field.is_empty() {
+        return false;
+    }
+
+    let actual = data.get(dependent_field);
+
+    match operator {
+        "equals" => actual == expected,
+        "not_equals" => actual != expected,
+        "contains" => actual
+            .and_then(|a| a.as_str())
+            .zip(expected.and_then(|e| e.as_str()))
+            .map(|(a, e)| a.contains(e))
+            .unwrap_or(false),
+        "gt" => actual
+            .and_then(|a| a.as_f64())
+            .zip(expected.and_then(|e| e.as_f64()))
+            .map(|(a, e)| a > e)
+            .unwrap_or(false),
+        "lt" => actual
+            .and_then(|a| a.as_f64())
+            .zip(expected.and_then(|e| e.as_f64()))
+            .map(|(a, e)| a < e)
+            .unwrap_or(false),
+        _ => false,
+    }
 }
 
 /// Check if a field value should be skipped based on visibility rules.

@@ -199,6 +199,9 @@ pub struct FieldDefinition {
     pub field_config: serde_json::Value,
     pub sort_order: i32,
     pub column_span: i32,
+    pub sub_table_columns: Option<serde_json::Value>,
+    pub lookup_fill_fields: Option<serde_json::Value>,
+    pub required_rule: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -268,6 +271,9 @@ pub struct SaveFieldInput {
     pub field_config: Option<serde_json::Value>,
     pub sort_order: i32,
     pub column_span: Option<i32>,
+    pub sub_table_columns: Option<serde_json::Value>,
+    pub lookup_fill_fields: Option<serde_json::Value>,
+    pub required_rule: Option<serde_json::Value>,
     pub options: Option<Vec<SaveFieldOptionInput>>,
 }
 

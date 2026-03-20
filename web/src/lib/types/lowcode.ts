@@ -144,6 +144,14 @@ export interface FieldDefinition {
   is_readonly?: boolean;
   width?: "full" | "half" | "third" | "quarter";
   field_config?: Record<string, unknown>;
+  sub_table_columns?: { key: string; label: string; type: string; required?: boolean }[];
+  lookup_fill_fields?: Record<string, string>;
+  required_rule?: {
+    dependent_field?: string;
+    operator?: string;
+    value?: string;
+    action?: string;
+  } | null;
 }
 
 export interface FormSection {

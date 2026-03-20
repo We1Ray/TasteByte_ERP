@@ -1350,6 +1350,11 @@
     "actionSuccess": "{action} executed successfully",
     "actionFailed": "{action} failed",
     "noContentConfigured": "No content configured for this action",
-    "downloadTemplate": "Download import template"
+    "downloadTemplate": "Download import template",
+    "subTableAddRow": "Add Row",
+    "subTableRemoveRow": "Remove",
+    "conditionallyRequired": "Conditionally required",
+    "statusTransitionNotAllowed": "This status change is not allowed",
+    "autoCreated": "Auto-created"
   }
 }

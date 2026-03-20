@@ -283,6 +283,16 @@ pub async fn create_data(
     )
     .await;
 
+    // Cross-operation write actions
+    execute_cross_operation_actions(
+        &state.pool,
+        operation.id,
+        record.id,
+        "ON_CREATE",
+        &record.data,
+    )
+    .await;
+
     // Audit log
     if let Err(e) = crate::shared::audit::log_change(
         &state.pool,
@@ -373,6 +383,24 @@ pub async fn update_data(
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("Record not found".to_string()))?;
+
+    // State machine validation
+    if let (Some(old_status), Some(new_status)) = (
+        old_record.data.get("status").and_then(|v| v.as_str()),
+        input.data.get("status").and_then(|v| v.as_str()),
+    ) {
+        if old_status != new_status {
+            let transition_allowed =
+                check_status_transition(&state.pool, operation.id, "status", old_status, new_status)
+                    .await?;
+            if !transition_allowed {
+                return Err(AppError::Validation(format!(
+                    "Status transition from '{}' to '{}' is not allowed",
+                    old_status, new_status
+                )));
+            }
+        }
+    }
 
     // Determine masked fields
     let form = form_builder::get_form(&state.pool, operation.id).await?;
@@ -852,4 +880,162 @@ async fn execute_list_operation_data(
         .collect();
 
     Ok((items, total))
+}
+
+/// Check if a status transition is allowed by the state machine definition.
+/// If no transitions are defined for the operation, all transitions are allowed (backward compatible).
+async fn check_status_transition(
+    pool: &PgPool,
+    operation_id: Uuid,
+    status_field: &str,
+    from_status: &str,
+    to_status: &str,
+) -> Result<bool, AppError> {
+    // Check if any transitions are defined for this operation
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM status_transitions WHERE operation_id = $1",
+    )
+    .bind(operation_id)
+    .fetch_one(pool)
+    .await?;
+
+    // If no transitions defined, allow all (backward compatible)
+    if count == 0 {
+        return Ok(true);
+    }
+
+    // Check if this specific transition is allowed
+    let transition: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM status_transitions WHERE operation_id = $1 AND status_field = $2 AND from_status = $3 AND to_status = $4",
+    )
+    .bind(operation_id)
+    .bind(status_field)
+    .bind(from_status)
+    .bind(to_status)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(transition.is_some())
+}
+
+/// Execute cross-operation write actions triggered by a record event.
+/// Looks up configured actions for the source operation, evaluates conditions,
+/// maps fields, and inserts new records into target operations.
+async fn execute_cross_operation_actions(
+    pool: &PgPool,
+    source_operation_id: Uuid,
+    _record_id: Uuid,
+    event: &str,
+    data: &serde_json::Value,
+) {
+    #[derive(sqlx::FromRow)]
+    struct CrossAction {
+        target_operation_code: String,
+        condition_field: Option<String>,
+        condition_operator: Option<String>,
+        condition_value: Option<String>,
+        field_mapping: serde_json::Value,
+    }
+
+    let actions: Vec<CrossAction> = match sqlx::query_as(
+        "SELECT target_operation_code, condition_field, condition_operator, condition_value, field_mapping FROM cross_operation_actions WHERE source_operation_id = $1 AND trigger_event = $2 AND is_active = true",
+    )
+    .bind(source_operation_id)
+    .bind(event)
+    .fetch_all(pool)
+    .await
+    {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::warn!("Cross-op actions query failed: {}", e);
+            return;
+        }
+    };
+
+    for action in actions {
+        // Evaluate condition
+        if let (Some(ref field), Some(ref op), Some(ref val)) = (
+            &action.condition_field,
+            &action.condition_operator,
+            &action.condition_value,
+        ) {
+            let actual = data.get(field).and_then(|v| v.as_str()).unwrap_or("");
+            let matches = match op.as_str() {
+                "equals" => actual == val,
+                "not_equals" => actual != val,
+                _ => true,
+            };
+            if !matches {
+                continue;
+            }
+        }
+
+        // Build target data from field mapping
+        let mut target_data = serde_json::Map::new();
+        if let Some(mapping) = action.field_mapping.as_object() {
+            for (target_field, source_expr) in mapping {
+                let source_str = source_expr.as_str().unwrap_or("");
+                let value = if source_str.starts_with('\'') {
+                    // Literal value (strip quotes)
+                    let literal = source_str.trim_matches('\'');
+                    // Handle concatenation with ||
+                    if literal.contains("|| ") {
+                        let parts: Vec<&str> = literal.split(" || ").collect();
+                        let mut result = String::new();
+                        for part in parts {
+                            let p = part.trim().trim_matches('\'');
+                            if let Some(val) = data.get(p).and_then(|v| v.as_str()) {
+                                result.push_str(val);
+                            } else {
+                                result.push_str(p);
+                            }
+                        }
+                        serde_json::Value::String(result)
+                    } else {
+                        serde_json::Value::String(literal.to_string())
+                    }
+                } else {
+                    // Field reference
+                    data.get(source_str)
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null)
+                };
+                target_data.insert(target_field.clone(), value);
+            }
+        }
+
+        // Find target operation and insert
+        let target_op: Option<(Uuid,)> = sqlx::query_as(
+            "SELECT id FROM lc_operations WHERE operation_code = $1",
+        )
+        .bind(&action.target_operation_code)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten();
+
+        if let Some((target_op_id,)) = target_op {
+            let target_json = serde_json::Value::Object(target_data);
+            if let Err(e) = sqlx::query(
+                "INSERT INTO lc_operation_data (operation_id, data) VALUES ($1, $2)",
+            )
+            .bind(target_op_id)
+            .bind(&target_json)
+            .execute(pool)
+            .await
+            {
+                tracing::warn!(
+                    "Cross-op write to {} failed: {}",
+                    action.target_operation_code,
+                    e
+                );
+            } else {
+                tracing::info!(
+                    "Cross-op: {} -> {} created",
+                    event,
+                    action.target_operation_code
+                );
+            }
+        }
+    }
 }

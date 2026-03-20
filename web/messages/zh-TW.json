@@ -1351,6 +1351,11 @@
     "actionSuccess": "{action} 執行成功",
     "actionFailed": "{action} 執行失敗",
     "noContentConfigured": "此操作尚未設定內容",
-    "downloadTemplate": "下載匯入範本"
+    "downloadTemplate": "下載匯入範本",
+    "subTableAddRow": "新增列",
+    "subTableRemoveRow": "刪除",
+    "conditionallyRequired": "條件式必填",
+    "statusTransitionNotAllowed": "此狀態變更不被允許",
+    "autoCreated": "自動建立"
   }
 }

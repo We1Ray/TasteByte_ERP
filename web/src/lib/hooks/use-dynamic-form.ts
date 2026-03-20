@@ -4,7 +4,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import type { ApiError } from "../api/client";
 import { formApi, executorApi, operationsApi } from "../api/lowcode";
+import { rulesApi } from "../api/system";
 import type { FormDefinition, FormRecord } from "../types/lowcode";
+import type { CalculationFormula } from "../api/system";
 
 export function useDynamicForm(operationCode: string) {
   const queryClient = useQueryClient();
@@ -20,6 +22,12 @@ export function useDynamicForm(operationCode: string) {
   const formQuery = useQuery<FormDefinition, AxiosError<ApiError>>({
     queryKey: ["lowcode", "form", operationId],
     queryFn: () => formApi.getDefinition(operationId!),
+    enabled: !!operationId,
+  });
+
+  const formulasQuery = useQuery<CalculationFormula[]>({
+    queryKey: ["lowcode", "formulas", operationId],
+    queryFn: () => rulesApi.listFormulas(operationId!),
     enabled: !!operationId,
   });
 
@@ -42,6 +50,7 @@ export function useDynamicForm(operationCode: string) {
   return {
     operation: operationQuery.data,
     formDefinition: formQuery.data,
+    formulas: (formulasQuery.data ?? []).filter((f) => f.is_active),
     isLoading: operationQuery.isLoading || formQuery.isLoading,
     error: operationQuery.error || formQuery.error,
     createRecord: createMutation.mutateAsync,

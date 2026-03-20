@@ -102,7 +102,7 @@ pub async fn save_form(
         for field_input in &section_input.fields {
             let field_id = field_input.id.unwrap_or_else(Uuid::new_v4);
             sqlx::query(
-                "INSERT INTO lc_field_definitions (id, section_id, field_name, field_label, field_type, db_table, db_column, is_required, is_unique, is_searchable, default_value, default_value_sql, placeholder, help_text, validation_regex, validation_message, min_value, max_value, min_length, max_length, depends_on, data_source_sql, display_column, value_column, visibility_rule, field_config, sort_order, column_span) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)",
+                "INSERT INTO lc_field_definitions (id, section_id, field_name, field_label, field_type, db_table, db_column, is_required, is_unique, is_searchable, default_value, default_value_sql, placeholder, help_text, validation_regex, validation_message, min_value, max_value, min_length, max_length, depends_on, data_source_sql, display_column, value_column, visibility_rule, field_config, sort_order, column_span, sub_table_columns, lookup_fill_fields, required_rule) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)",
             )
             .bind(field_id)
             .bind(section_id)
@@ -132,6 +132,9 @@ pub async fn save_form(
             .bind(field_input.field_config.as_ref().unwrap_or(&serde_json::json!({})))
             .bind(field_input.sort_order)
             .bind(field_input.column_span.unwrap_or(1))
+            .bind(&field_input.sub_table_columns)
+            .bind(&field_input.lookup_fill_fields)
+            .bind(&field_input.required_rule)
             .execute(&mut *tx)
             .await?;
 

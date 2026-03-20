@@ -412,6 +412,9 @@ pub async fn rollback_release(
                         field_config: Some(f.field.field_config),
                         sort_order: f.field.sort_order,
                         column_span: Some(f.field.column_span),
+                        sub_table_columns: f.field.sub_table_columns,
+                        lookup_fill_fields: f.field.lookup_fill_fields,
+                        required_rule: f.field.required_rule,
                         options: Some(
                             f.options
                                 .into_iter()
