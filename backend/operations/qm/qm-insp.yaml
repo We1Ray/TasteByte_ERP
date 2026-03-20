@@ -1,0 +1,171 @@
+operation_code: QM-INSP
+name: "品質檢驗記錄"
+description: "記錄原料/成品品檢結果、缺陷、判定"
+module: QM
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: SearchCheck
+  sort_order: 20
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "檢驗資訊"
+      columns: 2
+      fields:
+        - field_name: inspection_number
+          label: "檢驗單號"
+          type: TEXT
+          required: true
+          searchable: true
+          config:
+            is_readonly: true
+          default_value_sql: "SELECT 'QC-' || LPAD((COALESCE(MAX(CAST(SUBSTRING(data->>'inspection_number' FROM 'QC-(\\d+)') AS INT)), 0) + 1)::TEXT, 3, '0') FROM lc_operation_data WHERE operation_id = 'd5000000-0000-0000-0000-000000000001'"
+
+        - field_name: inspection_type
+          label: "檢驗類型"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "進料檢驗"
+              value: INCOMING
+            - label: "製程檢驗"
+              value: IN_PROCESS
+            - label: "成品檢驗"
+              value: FINAL
+            - label: "出貨檢驗"
+              value: OUTGOING
+
+        - field_name: material_name
+          label: "物料名稱"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: batch_number
+          label: "批號"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: sample_size
+          label: "抽樣數量"
+          type: NUMBER
+          required: true
+
+        - field_name: inspection_date
+          label: "檢驗日期"
+          type: DATE
+          required: true
+          default_value_sql: "SELECT CURRENT_DATE::TEXT"
+
+    - title: "檢驗項目"
+      columns: 2
+      fields:
+        - field_name: appearance
+          label: "外觀檢查"
+          type: DROPDOWN
+          required: true
+          options:
+            - label: "合格"
+              value: PASS
+            - label: "不合格"
+              value: FAIL
+
+        - field_name: weight_check
+          label: "重量檢查"
+          type: DROPDOWN
+          required: true
+          options:
+            - label: "合格"
+              value: PASS
+            - label: "不合格"
+              value: FAIL
+
+        - field_name: taste_check
+          label: "口味檢查"
+          type: DROPDOWN
+          options:
+            - label: "合格"
+              value: PASS
+            - label: "不合格"
+              value: FAIL
+
+        - field_name: packaging_check
+          label: "包裝檢查"
+          type: DROPDOWN
+          required: true
+          options:
+            - label: "合格"
+              value: PASS
+            - label: "不合格"
+              value: FAIL
+
+        - field_name: defect_count
+          label: "缺陷數量"
+          type: NUMBER
+
+        - field_name: defect_description
+          label: "缺陷說明"
+          type: TEXTAREA
+          column_span: 2
+          visibility_rule:
+            dependent_field: defect_count
+            operator: gt
+            value: "0"
+            action: show
+
+    - title: "判定與處置"
+      columns: 2
+      fields:
+        - field_name: overall_result
+          label: "綜合判定"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "合格"
+              value: PASS
+            - label: "條件允收"
+              value: CONDITIONAL
+            - label: "不合格"
+              value: FAIL
+
+        - field_name: disposition
+          label: "處置方式"
+          type: DROPDOWN
+          visibility_rule:
+            dependent_field: overall_result
+            operator: not_equals
+            value: PASS
+            action: show
+          options:
+            - label: "入庫"
+              value: ACCEPT
+            - label: "退貨"
+              value: RETURN
+            - label: "報廢"
+              value: SCRAP
+            - label: "讓步接收"
+              value: CONCESSION
+
+        - field_name: inspector_notes
+          label: "檢驗員備註"
+          type: TEXTAREA
+          column_span: 2
+
+output_rules:
+  - name: "品檢不合格通知採購"
+    trigger_event: ON_CREATE
+    condition_field: overall_result
+    condition_operator: equals
+    condition_value: FAIL
+    output_type: NOTIFICATION
+    recipient_type: STATIC
+    recipient_value: "a0000000-0000-0000-0000-000000000004"

@@ -8,6 +8,29 @@ use crate::lowcode::services::permission_resolver::{PlatformDeveloper, RequirePl
 use crate::shared::types::AppState;
 use crate::shared::{ApiResponse, AppError};
 
+pub async fn export_yaml(
+    State(state): State<AppState>,
+    _guard: RequirePlatformRole<PlatformDeveloper>,
+    Path(code): Path<String>,
+) -> Result<axum::response::Response, AppError> {
+    use axum::http::header;
+    use axum::response::IntoResponse;
+    let yaml =
+        crate::lowcode::yaml_sync::exporter::export_operation(&state.pool, &code).await?;
+    let filename = format!("{}.yaml", code.to_lowercase());
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/x-yaml".to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{}\"", filename),
+            ),
+        ],
+        yaml,
+    )
+        .into_response())
+}
+
 pub async fn get_form(
     State(state): State<AppState>,
     _guard: RequirePlatformRole<PlatformDeveloper>,

@@ -55,6 +55,16 @@ async fn main() {
     // Ensure admin password is properly hashed (seed SQL uses a placeholder)
     ensure_admin_password(&pool).await;
 
+    // Sync YAML operation definitions
+    let operations_dir =
+        std::env::var("OPERATIONS_DIR").unwrap_or_else(|_| "./operations".to_string());
+    let sync_report =
+        backend::lowcode::yaml_sync::syncer::sync_all(&pool, &operations_dir).await;
+    info!(
+        "YAML sync: {} operations synced, {} failed",
+        sync_report.synced, sync_report.failed
+    );
+
     // Initialize AI assistant (optional)
     let llm_client = LlmClient::new(&settings).map(std::sync::Arc::new);
     if llm_client.is_some() {

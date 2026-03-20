@@ -246,6 +246,11 @@ pub fn routes() -> Router<AppState> {
             "/exec/{code}/buttons",
             get(handlers::buttons::get_buttons_by_code),
         )
+        // YAML Export
+        .route(
+            "/operations/{code}/export-yaml",
+            get(handlers::forms::export_yaml),
+        )
         // AI Chat (Developer)
         .route("/operations/{id}/ai/chat", post(handlers::ai_chat::chat))
         .route("/ai/status", get(handlers::ai_chat::ai_status))

@@ -1,0 +1,150 @@
+operation_code: HR-LEAVE
+name: "請假申請"
+description: "員工請假申請，含假別、天數計算、主管簽核"
+module: HR
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: CalendarOff
+  sort_order: 30
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "請假資訊"
+      columns: 2
+      fields:
+        - field_name: employee_name
+          label: "申請人"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: department
+          label: "部門"
+          type: TEXT
+          required: true
+
+        - field_name: leave_type
+          label: "假別"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "特休"
+              value: ANNUAL
+            - label: "事假"
+              value: PERSONAL
+            - label: "病假"
+              value: SICK
+            - label: "公假"
+              value: OFFICIAL
+            - label: "婚假"
+              value: MARRIAGE
+            - label: "喪假"
+              value: BEREAVEMENT
+
+        - field_name: start_date
+          label: "開始日期"
+          type: DATE
+          required: true
+
+        - field_name: end_date
+          label: "結束日期"
+          type: DATE
+          required: true
+
+        - field_name: days
+          label: "天數"
+          type: NUMBER
+          required: true
+
+        - field_name: reason
+          label: "請假事由"
+          type: TEXTAREA
+          required: true
+          column_span: 2
+
+    - title: "簽核"
+      columns: 2
+      fields:
+        - field_name: status
+          label: "簽核狀態"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "待簽核"
+              value: PENDING
+              is_default: true
+            - label: "已核准"
+              value: APPROVED
+            - label: "已退回"
+              value: REJECTED
+            - label: "已取消"
+              value: CANCELLED
+
+        - field_name: approver
+          label: "主管"
+          type: TEXT
+
+        - field_name: approval_notes
+          label: "簽核意見"
+          type: TEXTAREA
+          column_span: 2
+          visibility_rule:
+            dependent_field: status
+            operator: not_equals
+            value: PENDING
+            action: show
+
+cross_field_rules:
+  - name: "日期順序"
+    description: "結束日期不得早於開始日期"
+    rule_type: VALIDATION
+    source_field: end_date
+    operator: gte
+    target_field: start_date
+    error_message: "結束日期不可早於開始日期"
+
+  - name: "天數檢查"
+    description: "請假天數必須大於0"
+    rule_type: VALIDATION
+    source_field: days
+    operator: gt
+    target_value: "0"
+    error_message: "請假天數必須大於0"
+
+approval:
+  name: "請假簽核"
+  description: "依請假天數分級簽核：1-3天主管簽核，3天以上需人資加簽"
+  levels:
+    - name: "直屬主管"
+      level_order: 1
+      approver_type: ROLE
+      approver_role: ADMIN
+      sla_hours: 24
+      auto_escalate: false
+    - name: "人資經理"
+      level_order: 2
+      condition_field: days
+      condition_operator: gte
+      condition_value: 3
+      approver_type: ROLE
+      approver_role: HR_MANAGER
+      sla_hours: 48
+      auto_escalate: true
+
+output_rules:
+  - name: "請假申請通知主管"
+    trigger_event: ON_CREATE
+    condition_field: status
+    condition_operator: equals
+    condition_value: PENDING
+    output_type: NOTIFICATION
+    recipient_type: STATIC
+    recipient_value: "a0000000-0000-0000-0000-000000000001"

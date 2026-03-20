@@ -1,0 +1,154 @@
+operation_code: MM-GRN
+name: "收貨單 (GRN)"
+description: "採購收貨確認，對應採購單數量核對，自動更新庫存"
+module: MM
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: PackageCheck
+  sort_order: 30
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "收貨單資訊"
+      description: "基本收貨資訊"
+      columns: 2
+      fields:
+        - field_name: grn_number
+          label: "GRN 編號"
+          type: TEXT
+          required: true
+          searchable: true
+          config:
+            is_readonly: true
+          default_value_sql: "SELECT 'GRN-' || LPAD((COALESCE(MAX(CAST(SUBSTRING(data->>'grn_number' FROM 'GRN-(\\d+)') AS INT)), 0) + 1)::TEXT, 3, '0') FROM lc_operation_data WHERE operation_id = 'd1000000-0000-0000-0000-000000000001'"
+
+        - field_name: po_number
+          label: "對應採購單號"
+          type: TEXT
+          required: true
+          searchable: true
+          placeholder: "例：PO-00001"
+
+        - field_name: vendor_name
+          label: "供應商"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: receipt_date
+          label: "收貨日期"
+          type: DATE
+          required: true
+          default_value_sql: "SELECT CURRENT_DATE::TEXT"
+
+        - field_name: warehouse
+          label: "收貨倉庫"
+          type: DROPDOWN
+          required: true
+          options:
+            - label: "台北主倉庫"
+              value: WH-001
+              is_default: true
+            - label: "桃園冷藏倉"
+              value: WH-002
+            - label: "台中配送中心"
+              value: WH-003
+
+        - field_name: status
+          label: "狀態"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "草稿"
+              value: DRAFT
+              is_default: true
+            - label: "已確認"
+              value: CONFIRMED
+            - label: "已入庫"
+              value: RECEIVED
+            - label: "已關閉"
+              value: CLOSED
+
+    - title: "收貨明細"
+      description: "各品項收貨數量"
+      columns: 1
+      fields:
+        - field_name: material_name
+          label: "物料名稱"
+          type: TEXT
+          required: true
+
+        - field_name: ordered_qty
+          label: "訂購數量"
+          type: NUMBER
+          required: true
+
+        - field_name: received_qty
+          label: "實收數量"
+          type: NUMBER
+          required: true
+
+        - field_name: rejected_qty
+          label: "退回數量"
+          type: NUMBER
+
+        - field_name: batch_number
+          label: "批號"
+          type: TEXT
+
+        - field_name: expiry_date
+          label: "有效期限"
+          type: DATE
+
+        - field_name: inspection_result
+          label: "品檢結果"
+          type: DROPDOWN
+          options:
+            - label: "合格"
+              value: PASS
+            - label: "條件允收"
+              value: CONDITIONAL
+            - label: "不合格"
+              value: FAIL
+
+        - field_name: notes
+          label: "備註"
+          type: TEXTAREA
+          visibility_rule:
+            dependent_field: inspection_result
+            operator: equals
+            value: FAIL
+            action: show
+
+cross_field_rules:
+  - name: "收貨數量上限"
+    description: "實收數量不得超過訂購數量的110%"
+    rule_type: VALIDATION
+    source_field: received_qty
+    operator: lte
+    error_message: "實收數量超過訂購數量上限"
+
+  - name: "退回數量限制"
+    description: "退回數量不可超過實收數量"
+    rule_type: VALIDATION
+    source_field: rejected_qty
+    operator: lte
+    target_field: received_qty
+    error_message: "退回數量不可超過實收數量"
+
+output_rules:
+  - name: "收貨確認通知財務"
+    trigger_event: ON_CREATE
+    condition_field: status
+    condition_operator: equals
+    condition_value: CONFIRMED
+    output_type: NOTIFICATION
+    recipient_type: STATIC
+    recipient_value: "a0000000-0000-0000-0000-000000000002"

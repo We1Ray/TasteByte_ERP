@@ -1,0 +1,123 @@
+operation_code: PP-CONSUME
+name: "生產用料確認"
+description: "記錄生產工單實際用料與產出，計算耗用差異"
+module: PP
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: Factory
+  sort_order: 30
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "工單資訊"
+      columns: 2
+      fields:
+        - field_name: production_order
+          label: "生產工單號"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: product_name
+          label: "產品名稱"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: work_date
+          label: "作業日期"
+          type: DATE
+          required: true
+          default_value_sql: "SELECT CURRENT_DATE::TEXT"
+
+        - field_name: shift
+          label: "班別"
+          type: DROPDOWN
+          required: true
+          options:
+            - label: "早班"
+              value: DAY
+            - label: "晚班"
+              value: NIGHT
+            - label: "全天"
+              value: FULL
+
+    - title: "用料記錄"
+      columns: 2
+      fields:
+        - field_name: material_consumed
+          label: "投入原料"
+          type: TEXT
+          required: true
+
+        - field_name: planned_qty
+          label: "計畫用量"
+          type: NUMBER
+          required: true
+
+        - field_name: actual_qty
+          label: "實際用量"
+          type: NUMBER
+          required: true
+
+        - field_name: variance
+          label: "差異"
+          type: NUMBER
+
+    - title: "產出記錄"
+      columns: 2
+      fields:
+        - field_name: output_qty
+          label: "產出數量"
+          type: NUMBER
+          required: true
+
+        - field_name: defect_qty
+          label: "不良品數量"
+          type: NUMBER
+
+        - field_name: yield_rate
+          label: "良率 (%)"
+          type: NUMBER
+
+        - field_name: production_notes
+          label: "生產備註"
+          type: TEXTAREA
+          column_span: 2
+
+cross_field_rules:
+  - name: "用量檢查"
+    description: "實際用量必須大於0"
+    rule_type: VALIDATION
+    source_field: actual_qty
+    operator: gt
+    target_value: "0"
+    error_message: "實際用量必須大於0"
+
+calculation_formulas:
+  - target_field: variance
+    formula: "actual_qty - planned_qty"
+    trigger_fields:
+      - actual_qty
+      - planned_qty
+    description: "用料差異 = 實際用量 - 計畫用量"
+
+  - target_field: yield_rate
+    formula: "output_qty / (output_qty + defect_qty) * 100"
+    trigger_fields:
+      - output_qty
+      - defect_qty
+    description: "良率 = 良品 / (良品+不良品) x 100"
+
+output_rules:
+  - name: "低良率通知品管"
+    trigger_event: ON_CREATE
+    output_type: NOTIFICATION
+    recipient_type: STATIC
+    recipient_value: "a0000000-0000-0000-0000-000000000007"

@@ -1,0 +1,118 @@
+operation_code: WM-MOVE
+name: "庫存異動單"
+description: "記錄入庫/出庫/調撥/盤點等庫存異動"
+module: WM
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: ArrowLeftRight
+  sort_order: 20
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "異動資訊"
+      columns: 2
+      fields:
+        - field_name: movement_type
+          label: "異動類型"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "入庫 (採購收貨)"
+              value: GR_PO
+            - label: "出庫 (銷售出貨)"
+              value: GI_SO
+            - label: "生產入庫"
+              value: GR_PROD
+            - label: "生產領料"
+              value: GI_PROD
+            - label: "倉庫調撥"
+              value: TRANSFER
+            - label: "盤點調整"
+              value: ADJUSTMENT
+            - label: "報廢"
+              value: SCRAP
+
+        - field_name: material_name
+          label: "物料名稱"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: quantity
+          label: "數量"
+          type: NUMBER
+          required: true
+
+        - field_name: unit
+          label: "單位"
+          type: TEXT
+          required: true
+
+        - field_name: from_warehouse
+          label: "來源倉庫"
+          type: DROPDOWN
+          visibility_rule:
+            dependent_field: movement_type
+            operator: equals
+            value: TRANSFER
+            action: show
+          options:
+            - label: "台北主倉庫"
+              value: WH-001
+            - label: "桃園冷藏倉"
+              value: WH-002
+            - label: "台中配送中心"
+              value: WH-003
+
+        - field_name: to_warehouse
+          label: "目的倉庫"
+          type: DROPDOWN
+          visibility_rule:
+            dependent_field: movement_type
+            operator: equals
+            value: TRANSFER
+            action: show
+          options:
+            - label: "台北主倉庫"
+              value: WH-001
+            - label: "桃園冷藏倉"
+              value: WH-002
+            - label: "台中配送中心"
+              value: WH-003
+
+        - field_name: batch_number
+          label: "批號"
+          type: TEXT
+          searchable: true
+
+        - field_name: reference_doc
+          label: "參考單號"
+          type: TEXT
+          searchable: true
+
+        - field_name: movement_date
+          label: "異動日期"
+          type: DATE
+          required: true
+          default_value_sql: "SELECT CURRENT_DATE::TEXT"
+
+        - field_name: reason
+          label: "異動原因"
+          type: TEXTAREA
+          column_span: 2
+
+cross_field_rules:
+  - name: "異動數量"
+    description: "異動數量必須大於0"
+    rule_type: VALIDATION
+    source_field: quantity
+    operator: gt
+    target_value: "0"
+    error_message: "異動數量必須大於0"

@@ -1,0 +1,164 @@
+operation_code: MM-EVAL
+name: "供應商評鑑"
+description: "定期評鑑供應商品質、交期、服務，分數低於60需提出改善計畫"
+module: MM
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: ClipboardCheck
+  sort_order: 40
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "供應商資訊"
+      columns: 2
+      fields:
+        - field_name: vendor_name
+          label: "供應商名稱"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: eval_date
+          label: "評鑑日期"
+          type: DATE
+          required: true
+
+        - field_name: eval_period
+          label: "評鑑期間"
+          type: DROPDOWN
+          required: true
+          options:
+            - label: "2026 Q1"
+              value: 2026Q1
+            - label: "2026 Q2"
+              value: 2026Q2
+            - label: "2026 Q3"
+              value: 2026Q3
+            - label: "2026 Q4"
+              value: 2026Q4
+
+        - field_name: evaluator
+          label: "評鑑人"
+          type: TEXT
+          required: true
+
+    - title: "評分項目"
+      columns: 3
+      fields:
+        - field_name: quality_score
+          label: "品質分數"
+          type: NUMBER
+          required: true
+          validation:
+            min_value: 0
+            max_value: 100
+
+        - field_name: delivery_score
+          label: "交期分數"
+          type: NUMBER
+          required: true
+          validation:
+            min_value: 0
+            max_value: 100
+
+        - field_name: service_score
+          label: "服務分數"
+          type: NUMBER
+          required: true
+          validation:
+            min_value: 0
+            max_value: 100
+
+        - field_name: price_score
+          label: "價格分數"
+          type: NUMBER
+          required: true
+          validation:
+            min_value: 0
+            max_value: 100
+
+        - field_name: overall_score
+          label: "綜合分數"
+          type: NUMBER
+          searchable: true
+          validation:
+            min_value: 0
+            max_value: 100
+
+    - title: "評鑑結果"
+      columns: 2
+      fields:
+        - field_name: rating
+          label: "評等"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "優良 (A)"
+              value: A
+            - label: "合格 (B)"
+              value: B
+            - label: "待改善 (C)"
+              value: C
+            - label: "不合格 (D)"
+              value: D
+
+        - field_name: excellence_note
+          label: "優良供應商備註"
+          type: TEXTAREA
+          column_span: 2
+          visibility_rule:
+            dependent_field: overall_score
+            operator: gt
+            value: "79"
+            action: show
+
+        - field_name: improvement_plan
+          label: "改善計畫"
+          type: TEXTAREA
+          column_span: 2
+          visibility_rule:
+            dependent_field: overall_score
+            operator: lt
+            value: "60"
+            action: show
+
+        - field_name: comments
+          label: "備註"
+          type: TEXTAREA
+          column_span: 2
+
+cross_field_rules:
+  - name: "綜合分數範圍"
+    description: "綜合分數不得超過100"
+    rule_type: VALIDATION
+    source_field: overall_score
+    operator: lte
+    target_value: "100"
+    error_message: "綜合分數不可超過100"
+
+calculation_formulas:
+  - target_field: overall_score
+    formula: "quality_score * 0.3 + delivery_score * 0.25 + service_score * 0.25 + price_score * 0.2"
+    trigger_fields:
+      - quality_score
+      - delivery_score
+      - service_score
+      - price_score
+    description: "綜合分數 = 品質30% + 交期25% + 服務25% + 價格20%"
+
+output_rules:
+  - name: "D級供應商警示"
+    trigger_event: ON_CREATE
+    condition_field: rating
+    condition_operator: equals
+    condition_value: D
+    output_type: NOTIFICATION
+    recipient_type: STATIC
+    recipient_value: "a0000000-0000-0000-0000-000000000001"

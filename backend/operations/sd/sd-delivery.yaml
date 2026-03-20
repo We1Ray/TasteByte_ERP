@@ -1,0 +1,130 @@
+operation_code: SD-DELIVERY
+name: "出貨確認單"
+description: "銷售出貨確認，記錄出貨數量、運送資訊，出貨後才可開立發票"
+module: SD
+operation_type: FORM
+project_code: LCP-100
+is_published: true
+version: 1
+
+sidebar:
+  icon: Truck
+  sort_order: 30
+
+form:
+  layout: {}
+  settings: {}
+  sections:
+    - title: "出貨資訊"
+      columns: 2
+      fields:
+        - field_name: delivery_number
+          label: "出貨單號"
+          type: TEXT
+          required: true
+          searchable: true
+          config:
+            is_readonly: true
+          default_value_sql: "SELECT 'DLV-' || LPAD((COALESCE(MAX(CAST(SUBSTRING(data->>'delivery_number' FROM 'DLV-(\\d+)') AS INT)), 0) + 1)::TEXT, 3, '0') FROM lc_operation_data WHERE operation_id = 'd2000000-0000-0000-0000-000000000001'"
+
+        - field_name: so_number
+          label: "銷售訂單號"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: customer_name
+          label: "客戶名稱"
+          type: TEXT
+          required: true
+          searchable: true
+
+        - field_name: delivery_date
+          label: "出貨日期"
+          type: DATE
+          required: true
+          default_value_sql: "SELECT CURRENT_DATE::TEXT"
+
+        - field_name: status
+          label: "狀態"
+          type: DROPDOWN
+          required: true
+          searchable: true
+          options:
+            - label: "準備中"
+              value: PREPARING
+            - label: "已出貨"
+              value: SHIPPED
+            - label: "運送中"
+              value: IN_TRANSIT
+            - label: "已送達"
+              value: DELIVERED
+            - label: "已簽收"
+              value: SIGNED
+
+    - title: "出貨明細"
+      columns: 1
+      fields:
+        - field_name: material_name
+          label: "商品名稱"
+          type: TEXT
+          required: true
+
+        - field_name: ordered_qty
+          label: "訂購數量"
+          type: NUMBER
+          required: true
+
+        - field_name: shipped_qty
+          label: "出貨數量"
+          type: NUMBER
+          required: true
+
+        - field_name: batch_number
+          label: "批號"
+          type: TEXT
+
+    - title: "運送資訊"
+      columns: 2
+      fields:
+        - field_name: carrier
+          label: "物流公司"
+          type: TEXT
+
+        - field_name: tracking_number
+          label: "物流追蹤號"
+          type: TEXT
+          searchable: true
+
+        - field_name: shipping_address
+          label: "送貨地址"
+          type: TEXTAREA
+          column_span: 2
+
+        - field_name: receiver_signature
+          label: "簽收人"
+          type: TEXT
+          visibility_rule:
+            dependent_field: status
+            operator: equals
+            value: SIGNED
+            action: show
+
+cross_field_rules:
+  - name: "出貨數量限制"
+    description: "出貨數量不可超過訂購數量"
+    rule_type: VALIDATION
+    source_field: shipped_qty
+    operator: lte
+    target_field: ordered_qty
+    error_message: "出貨數量不可超過訂購數量"
+
+output_rules:
+  - name: "出貨完成通知財務"
+    trigger_event: ON_CREATE
+    condition_field: status
+    condition_operator: equals
+    condition_value: SHIPPED
+    output_type: NOTIFICATION
+    recipient_type: STATIC
+    recipient_value: "a0000000-0000-0000-0000-000000000002"

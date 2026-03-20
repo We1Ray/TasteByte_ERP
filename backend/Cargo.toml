@@ -15,7 +15,7 @@ argon2 = "0.5"
 validator = { version = "0.18", features = ["derive"] }
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
 rust_decimal = { version = "1", features = ["serde-with-str"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
@@ -35,6 +35,8 @@ metrics-exporter-prometheus = "0.16"
 reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 lettre = { version = "0.11", features = ["tokio1-native-tls", "builder"] }
 tera = "1"
+serde_yaml = "0.9"
+walkdir = "2"
 tokio-cron-scheduler = "0.13"
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 
