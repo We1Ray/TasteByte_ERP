@@ -240,8 +240,7 @@ pub async fn create_data(
     }
 
     // Cross-field validation
-    let cf_rules =
-        crate::shared::cross_field::list_rules(&state.pool, operation.id).await?;
+    let cf_rules = crate::shared::cross_field::list_rules(&state.pool, operation.id).await?;
     if !cf_rules.is_empty() {
         let cf_errors = crate::shared::cross_field::validate_cross_field_rules(
             &cf_rules,
@@ -256,8 +255,7 @@ pub async fn create_data(
     }
 
     // Apply calculation formulas
-    let formulas =
-        crate::shared::cross_field::list_formulas(&state.pool, operation.id).await?;
+    let formulas = crate::shared::cross_field::list_formulas(&state.pool, operation.id).await?;
     let insert_data = if !formulas.is_empty() {
         let mut prepared = validation.prepared_data.clone();
         crate::shared::cross_field::apply_formulas(&formulas, &mut prepared);
@@ -419,8 +417,7 @@ pub async fn update_data(
     }
 
     // Cross-field validation
-    let cf_rules =
-        crate::shared::cross_field::list_rules(&state.pool, operation.id).await?;
+    let cf_rules = crate::shared::cross_field::list_rules(&state.pool, operation.id).await?;
     if !cf_rules.is_empty() {
         let cf_errors = crate::shared::cross_field::validate_cross_field_rules(
             &cf_rules,
@@ -435,8 +432,7 @@ pub async fn update_data(
     }
 
     // Apply calculation formulas
-    let formulas =
-        crate::shared::cross_field::list_formulas(&state.pool, operation.id).await?;
+    let formulas = crate::shared::cross_field::list_formulas(&state.pool, operation.id).await?;
     let update_data = if !formulas.is_empty() {
         let mut prepared = validation.prepared_data.clone();
         crate::shared::cross_field::apply_formulas(&formulas, &mut prepared);

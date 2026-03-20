@@ -33,11 +33,10 @@ pub async fn save_buttons(
     Json(input): Json<SaveOperationButtonsInput>,
 ) -> Result<Json<ApiResponse<Vec<OperationButton>>>, AppError> {
     // Verify operation exists
-    let exists: Option<(Uuid,)> =
-        sqlx::query_as("SELECT id FROM lc_operations WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let exists: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM lc_operations WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?;
 
     if exists.is_none() {
         return Err(AppError::NotFound("Operation not found".to_string()));

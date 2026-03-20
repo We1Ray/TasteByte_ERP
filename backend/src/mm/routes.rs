@@ -58,6 +58,23 @@ pub fn routes() -> Router<AppState> {
             "/purchase-orders/{id}/receive",
             post(handlers::receive_purchase_order),
         )
+        // Goods Receipts (GRN)
+        .route(
+            "/goods-receipts",
+            get(handlers::list_goods_receipts).post(handlers::create_goods_receipt),
+        )
+        .route("/goods-receipts/{id}", get(handlers::get_goods_receipt))
+        .route(
+            "/goods-receipts/{id}/confirm",
+            post(handlers::confirm_goods_receipt),
+        )
+        // Stock Reservations
+        .route(
+            "/stock-reservations",
+            get(handlers::list_stock_reservations),
+        )
+        // Stock Movements (unified ledger)
+        .route("/stock-movements", get(handlers::list_stock_movements))
         // Goods Issue (convenience endpoint)
         .route("/goods-issue", post(handlers::goods_issue))
         // Reports

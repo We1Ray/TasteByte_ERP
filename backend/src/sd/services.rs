@@ -320,6 +320,40 @@ pub async fn create_delivery(
     Ok(delivery)
 }
 
+pub async fn get_delivery(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<(Delivery, Vec<DeliveryItem>), AppError> {
+    let delivery = repositories::get_delivery(pool, id).await?;
+    let items = repositories::get_delivery_items(pool, id).await?;
+    Ok((delivery, items))
+}
+
+/// Ship a delivery: CREATED -> SHIPPED
+pub async fn ship_delivery(
+    pool: &PgPool,
+    delivery_id: Uuid,
+    user_id: Uuid,
+) -> Result<Delivery, AppError> {
+    let delivery = repositories::get_delivery(pool, delivery_id).await?;
+    if delivery.status != "CREATED" {
+        return Err(AppError::Validation(format!(
+            "Cannot ship delivery in status '{}'",
+            delivery.status
+        )));
+    }
+
+    let result = sqlx::query_as::<_, Delivery>(
+        "UPDATE sd_deliveries SET status = 'SHIPPED', shipped_by = $2, shipped_at = NOW() WHERE id = $1 RETURNING *",
+    )
+    .bind(delivery_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(result)
+}
+
 pub async fn list_sd_invoices(
     pool: &PgPool,
     params: &ListParams,

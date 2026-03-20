@@ -1,7 +1,7 @@
+use crate::shared::AppError;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::shared::AppError;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ExchangeRate {
@@ -24,11 +24,17 @@ pub struct CreateExchangeRate {
 }
 
 pub async fn list_rates(pool: &PgPool) -> Result<Vec<ExchangeRate>, AppError> {
-    Ok(sqlx::query_as::<_, ExchangeRate>("SELECT * FROM exchange_rates ORDER BY from_currency, to_currency, valid_from DESC")
-        .fetch_all(pool).await?)
+    Ok(sqlx::query_as::<_, ExchangeRate>(
+        "SELECT * FROM exchange_rates ORDER BY from_currency, to_currency, valid_from DESC",
+    )
+    .fetch_all(pool)
+    .await?)
 }
 
-pub async fn create_rate(pool: &PgPool, input: CreateExchangeRate) -> Result<ExchangeRate, AppError> {
+pub async fn create_rate(
+    pool: &PgPool,
+    input: CreateExchangeRate,
+) -> Result<ExchangeRate, AppError> {
     Ok(sqlx::query_as::<_, ExchangeRate>(
         "INSERT INTO exchange_rates (from_currency,to_currency,rate,valid_from) VALUES ($1,$2,$3,$4) RETURNING *"
     ).bind(&input.from_currency).bind(&input.to_currency).bind(input.rate).bind(input.valid_from)
@@ -36,12 +42,23 @@ pub async fn create_rate(pool: &PgPool, input: CreateExchangeRate) -> Result<Exc
 }
 
 pub async fn delete_rate(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM exchange_rates WHERE id=$1").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM exchange_rates WHERE id=$1")
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
-pub async fn convert(pool: &PgPool, from: &str, to: &str, amount: rust_decimal::Decimal, date: chrono::NaiveDate) -> Result<rust_decimal::Decimal, AppError> {
-    if from == to { return Ok(amount); }
+pub async fn convert(
+    pool: &PgPool,
+    from: &str,
+    to: &str,
+    amount: rust_decimal::Decimal,
+    date: chrono::NaiveDate,
+) -> Result<rust_decimal::Decimal, AppError> {
+    if from == to {
+        return Ok(amount);
+    }
     let rate = sqlx::query_as::<_, ExchangeRate>(
         "SELECT * FROM exchange_rates WHERE from_currency=$1 AND to_currency=$2 AND valid_from<=$3 ORDER BY valid_from DESC LIMIT 1"
     ).bind(from).bind(to).bind(date).fetch_optional(pool).await?

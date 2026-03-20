@@ -119,6 +119,146 @@ pub async fn create_material_movement(
     repositories::create_material_movement(pool, &doc_number, &input, user_id).await
 }
 
+// --- Goods Receipts (GRN) ---
+pub async fn list_goods_receipts(
+    pool: &PgPool,
+    params: &ListParams,
+) -> Result<PaginatedResponse<GoodsReceipt>, AppError> {
+    let total = repositories::count_goods_receipts(pool, params).await?;
+    let data = repositories::list_goods_receipts(pool, params).await?;
+    Ok(PaginatedResponse::from_list_params(data, total, params))
+}
+
+pub async fn get_goods_receipt(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<(GoodsReceipt, Vec<GoodsReceiptItem>), AppError> {
+    let grn = repositories::get_goods_receipt(pool, id).await?;
+    let items = repositories::get_goods_receipt_items(pool, id).await?;
+    Ok((grn, items))
+}
+
+pub async fn create_goods_receipt(
+    pool: &PgPool,
+    input: CreateGoodsReceipt,
+    user_id: Uuid,
+) -> Result<GoodsReceipt, AppError> {
+    let grn_number = repositories::next_number(pool, "GRN").await?;
+    repositories::create_goods_receipt(pool, &grn_number, &input, user_id).await
+}
+
+/// Confirm a GRN: DRAFT -> CONFIRMED. Updates plant stock and PO received quantities.
+pub async fn confirm_goods_receipt(
+    pool: &PgPool,
+    grn_id: Uuid,
+    user_id: Uuid,
+) -> Result<GoodsReceipt, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let grn = repositories::get_goods_receipt_on_conn(&mut *tx, grn_id).await?;
+    if grn.status != "DRAFT" {
+        return Err(AppError::Validation(format!(
+            "Cannot confirm GRN in status '{}'",
+            grn.status
+        )));
+    }
+
+    let items = repositories::get_goods_receipt_items_on_conn(&mut *tx, grn_id).await?;
+
+    for item in &items {
+        let accepted_qty = item.received_quantity - item.rejected_quantity.unwrap_or(Decimal::ZERO);
+        if accepted_qty <= Decimal::ZERO {
+            continue;
+        }
+
+        // Create GOODS_RECEIPT movement
+        let doc_number = repositories::next_number_on_conn(&mut *tx, "MVT").await?;
+        let movement = CreateMaterialMovement {
+            movement_type: "GOODS_RECEIPT".to_string(),
+            material_id: item.material_id,
+            warehouse_id: grn.warehouse_id,
+            quantity: accepted_qty,
+            uom_id: item.uom_id,
+            reference_type: Some("GRN".to_string()),
+            reference_id: Some(grn_id),
+        };
+        repositories::create_material_movement_on_conn(&mut *tx, &doc_number, &movement, user_id)
+            .await?;
+
+        // Record in unified stock movements ledger
+        sqlx::query(
+            "INSERT INTO mm_stock_movements (material_id, warehouse_id, movement_type, quantity, reference_type, reference_id, batch_number, notes, created_by) \
+             VALUES ($1, $2, 'GOODS_RECEIPT', $3, 'GRN', $4, $5, $6, $7)"
+        )
+        .bind(item.material_id)
+        .bind(grn.warehouse_id)
+        .bind(accepted_qty)
+        .bind(grn_id)
+        .bind(&item.batch_number)
+        .bind(&item.notes)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Update PO item received quantity if linked to a PO
+        if let Some(po_item_id) = item.po_item_id {
+            repositories::update_po_item_received_on_conn(&mut *tx, po_item_id, accepted_qty)
+                .await?;
+        }
+    }
+
+    // Update GRN status
+    let confirmed = sqlx::query_as::<_, GoodsReceipt>(
+        "UPDATE mm_goods_receipts SET status = 'CONFIRMED', updated_at = NOW() WHERE id = $1 RETURNING *",
+    )
+    .bind(grn_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // If linked to a PO, update PO status based on received quantities
+    if let Some(po_id) = grn.purchase_order_id {
+        let po_items = repositories::get_purchase_order_items_on_conn(&mut *tx, po_id).await?;
+        let all_received = po_items.iter().all(|i| i.received_quantity >= i.quantity);
+        let any_received = po_items.iter().any(|i| i.received_quantity > Decimal::ZERO);
+
+        if all_received {
+            let po = repositories::get_purchase_order_on_conn(&mut *tx, po_id).await?;
+            if po.status == "RELEASED" || po.status == "PARTIALLY_RECEIVED" {
+                repositories::update_po_status_on_conn(&mut *tx, po_id, "RECEIVED").await?;
+            }
+        } else if any_received {
+            let po = repositories::get_purchase_order_on_conn(&mut *tx, po_id).await?;
+            if po.status == "RELEASED" {
+                repositories::update_po_status_on_conn(&mut *tx, po_id, "PARTIALLY_RECEIVED")
+                    .await?;
+            }
+        }
+    }
+
+    tx.commit().await?;
+    Ok(confirmed)
+}
+
+// --- Stock Reservations ---
+pub async fn list_stock_reservations(
+    pool: &PgPool,
+    params: &ListParams,
+) -> Result<PaginatedResponse<StockReservation>, AppError> {
+    let total = repositories::count_stock_reservations(pool, params).await?;
+    let data = repositories::list_stock_reservations(pool, params).await?;
+    Ok(PaginatedResponse::from_list_params(data, total, params))
+}
+
+// --- Stock Movements ---
+pub async fn list_stock_movements(
+    pool: &PgPool,
+    params: &ListParams,
+) -> Result<PaginatedResponse<StockMovement>, AppError> {
+    let total = repositories::count_stock_movements(pool, params).await?;
+    let data = repositories::list_stock_movements(pool, params).await?;
+    Ok(PaginatedResponse::from_list_params(data, total, params))
+}
+
 pub async fn list_purchase_orders(
     pool: &PgPool,
     params: &ListParams,

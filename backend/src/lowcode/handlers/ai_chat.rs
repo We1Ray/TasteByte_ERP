@@ -25,22 +25,19 @@ pub async fn chat(
         .ok_or_else(|| AppError::Validation("AI assistant is not enabled".to_string()))?;
 
     // Load operation
-    let operation: Operation = sqlx::query_as(
-        "SELECT * FROM lc_operations WHERE id = $1",
-    )
-    .bind(operation_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Operation not found".to_string()))?;
+    let operation: Operation = sqlx::query_as("SELECT * FROM lc_operations WHERE id = $1")
+        .bind(operation_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Operation not found".to_string()))?;
 
-    let context_type = input
-        .context_type
-        .as_deref()
-        .unwrap_or(match operation.operation_type.to_lowercase().as_str() {
+    let context_type = input.context_type.as_deref().unwrap_or(
+        match operation.operation_type.to_lowercase().as_str() {
             "list" => "list",
             "dashboard" => "dashboard",
             _ => "form",
-        });
+        },
+    );
 
     // Load table list for context
     let tables: Vec<(String,)> = sqlx::query_as(
@@ -55,8 +52,7 @@ pub async fn chat(
     let current_state = load_current_state(&state.pool, operation_id, context_type).await?;
 
     // Build system prompt
-    let system_prompt =
-        build_system_prompt(&operation, context_type, &current_state, &table_names);
+    let system_prompt = build_system_prompt(&operation, context_type, &current_state, &table_names);
 
     // Build tool definitions
     let tool_defs = get_tool_definitions(context_type);
@@ -155,8 +151,7 @@ async fn load_current_state(
 ) -> Result<serde_json::Value, AppError> {
     match context_type {
         "form" => {
-            let form =
-                crate::lowcode::services::form_builder::get_form(pool, operation_id).await?;
+            let form = crate::lowcode::services::form_builder::get_form(pool, operation_id).await?;
             Ok(serde_json::to_value(&form).unwrap_or_default())
         }
         "list" => {
@@ -189,12 +184,11 @@ async fn load_current_state(
             }
         }
         "dashboard" => {
-            let dash: Option<DashboardDefinitionRow> = sqlx::query_as(
-                "SELECT * FROM lc_dashboard_definitions WHERE operation_id = $1",
-            )
-            .bind(operation_id)
-            .fetch_optional(pool)
-            .await?;
+            let dash: Option<DashboardDefinitionRow> =
+                sqlx::query_as("SELECT * FROM lc_dashboard_definitions WHERE operation_id = $1")
+                    .bind(operation_id)
+                    .fetch_optional(pool)
+                    .await?;
             if let Some(dash) = dash {
                 let widgets: Vec<DashboardWidgetRow> = sqlx::query_as(
                     "SELECT * FROM lc_dashboard_widgets WHERE dashboard_id = $1 ORDER BY sort_order",

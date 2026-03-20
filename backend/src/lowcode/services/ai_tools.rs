@@ -286,13 +286,15 @@ pub async fn execute_tool(
             let dialect = PostgreSqlDialect {};
             match Parser::parse_sql(&dialect, sql) {
                 Ok(stmts) => {
-                    let all_select = stmts.iter().all(|s| {
-                        matches!(s, sqlparser::ast::Statement::Query(_))
-                    });
+                    let all_select = stmts
+                        .iter()
+                        .all(|s| matches!(s, sqlparser::ast::Statement::Query(_)));
                     if all_select {
                         Ok(serde_json::json!({ "valid": true }))
                     } else {
-                        Ok(serde_json::json!({ "valid": false, "error": "Only SELECT statements are allowed" }))
+                        Ok(
+                            serde_json::json!({ "valid": false, "error": "Only SELECT statements are allowed" }),
+                        )
                     }
                 }
                 Err(e) => Ok(serde_json::json!({ "valid": false, "error": e.to_string() })),
@@ -300,19 +302,19 @@ pub async fn execute_tool(
         }
 
         "get_current_form" => {
-            let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id).await?;
+            let form =
+                crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id).await?;
             let val = serde_json::to_value(&form)
                 .map_err(|e| AppError::Internal(format!("Serialization error: {e}")))?;
             Ok(val)
         }
 
         "get_current_list" => {
-            let list: Option<crate::lowcode::models::ListDefinitionRow> = sqlx::query_as(
-                "SELECT * FROM lc_list_definitions WHERE operation_id = $1",
-            )
-            .bind(ctx.operation_id)
-            .fetch_optional(pool)
-            .await?;
+            let list: Option<crate::lowcode::models::ListDefinitionRow> =
+                sqlx::query_as("SELECT * FROM lc_list_definitions WHERE operation_id = $1")
+                    .bind(ctx.operation_id)
+                    .fetch_optional(pool)
+                    .await?;
 
             if let Some(list) = list {
                 let columns: Vec<crate::lowcode::models::ListColumnRow> = sqlx::query_as(
@@ -339,12 +341,11 @@ pub async fn execute_tool(
         }
 
         "get_current_dashboard" => {
-            let dash: Option<crate::lowcode::models::DashboardDefinitionRow> = sqlx::query_as(
-                "SELECT * FROM lc_dashboard_definitions WHERE operation_id = $1",
-            )
-            .bind(ctx.operation_id)
-            .fetch_optional(pool)
-            .await?;
+            let dash: Option<crate::lowcode::models::DashboardDefinitionRow> =
+                sqlx::query_as("SELECT * FROM lc_dashboard_definitions WHERE operation_id = $1")
+                    .bind(ctx.operation_id)
+                    .fetch_optional(pool)
+                    .await?;
 
             if let Some(dash) = dash {
                 let widgets: Vec<crate::lowcode::models::DashboardWidgetRow> = sqlx::query_as(
@@ -369,7 +370,9 @@ pub async fn execute_tool(
                 .get("form")
                 .ok_or_else(|| AppError::Validation("form is required".into()))?;
             ctx.proposed_form = Some(form.clone());
-            Ok(serde_json::json!({ "status": "ok", "message": "Form definition set as proposed change" }))
+            Ok(
+                serde_json::json!({ "status": "ok", "message": "Form definition set as proposed change" }),
+            )
         }
 
         "set_list_definition" => {
@@ -377,7 +380,9 @@ pub async fn execute_tool(
                 .get("list")
                 .ok_or_else(|| AppError::Validation("list is required".into()))?;
             ctx.proposed_list = Some(list.clone());
-            Ok(serde_json::json!({ "status": "ok", "message": "List definition set as proposed change" }))
+            Ok(
+                serde_json::json!({ "status": "ok", "message": "List definition set as proposed change" }),
+            )
         }
 
         "set_dashboard_definition" => {
@@ -385,7 +390,9 @@ pub async fn execute_tool(
                 .get("dashboard")
                 .ok_or_else(|| AppError::Validation("dashboard is required".into()))?;
             ctx.proposed_dashboard = Some(dashboard.clone());
-            Ok(serde_json::json!({ "status": "ok", "message": "Dashboard definition set as proposed change" }))
+            Ok(
+                serde_json::json!({ "status": "ok", "message": "Dashboard definition set as proposed change" }),
+            )
         }
 
         "set_operation_buttons" => {
@@ -399,7 +406,8 @@ pub async fn execute_tool(
         "add_section" => {
             // Initialize proposed_form from current if not set
             if ctx.proposed_form.is_none() {
-                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id).await?;
+                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id)
+                    .await?;
                 ctx.proposed_form = Some(
                     serde_json::to_value(&form)
                         .map_err(|e| AppError::Internal(format!("Serialization error: {e}")))?,
@@ -428,7 +436,8 @@ pub async fn execute_tool(
 
         "add_field" => {
             if ctx.proposed_form.is_none() {
-                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id).await?;
+                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id)
+                    .await?;
                 ctx.proposed_form = Some(
                     serde_json::to_value(&form)
                         .map_err(|e| AppError::Internal(format!("Serialization error: {e}")))?,
@@ -471,7 +480,8 @@ pub async fn execute_tool(
 
         "update_field" => {
             if ctx.proposed_form.is_none() {
-                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id).await?;
+                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id)
+                    .await?;
                 ctx.proposed_form = Some(
                     serde_json::to_value(&form)
                         .map_err(|e| AppError::Internal(format!("Serialization error: {e}")))?,
@@ -514,7 +524,9 @@ pub async fn execute_tool(
             }
 
             if found {
-                Ok(serde_json::json!({ "status": "ok", "message": format!("Field '{}' updated", field_name) }))
+                Ok(
+                    serde_json::json!({ "status": "ok", "message": format!("Field '{}' updated", field_name) }),
+                )
             } else {
                 Err(AppError::Validation(format!(
                     "Field '{}' not found in proposed form",
@@ -525,7 +537,8 @@ pub async fn execute_tool(
 
         "remove_field" => {
             if ctx.proposed_form.is_none() {
-                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id).await?;
+                let form = crate::lowcode::services::form_builder::get_form(pool, ctx.operation_id)
+                    .await?;
                 ctx.proposed_form = Some(
                     serde_json::to_value(&form)
                         .map_err(|e| AppError::Internal(format!("Serialization error: {e}")))?,
@@ -555,7 +568,9 @@ pub async fn execute_tool(
             }
 
             if found {
-                Ok(serde_json::json!({ "status": "ok", "message": format!("Field '{}' removed", field_name) }))
+                Ok(
+                    serde_json::json!({ "status": "ok", "message": format!("Field '{}' removed", field_name) }),
+                )
             } else {
                 Err(AppError::Validation(format!(
                     "Field '{}' not found",
@@ -577,7 +592,11 @@ pub fn build_system_prompt(
 ) -> String {
     let tables_list = if table_names.len() > 50 {
         let sample: Vec<&str> = table_names.iter().take(50).map(|s| s.as_str()).collect();
-        format!("{} (showing first 50 of {})", sample.join(", "), table_names.len())
+        format!(
+            "{} (showing first 50 of {})",
+            sample.join(", "),
+            table_names.len()
+        )
     } else {
         table_names.join(", ")
     };
@@ -637,7 +656,11 @@ A form consists of sections, each containing fields:
 }
 
 /// Generate a human-readable summary of changes between current and proposed definitions.
-pub fn generate_change_summary(current: &Value, proposed: &Value, change_type: &str) -> Vec<String> {
+pub fn generate_change_summary(
+    current: &Value,
+    proposed: &Value,
+    change_type: &str,
+) -> Vec<String> {
     let mut summary = Vec::new();
 
     match change_type {
@@ -720,10 +743,7 @@ pub fn generate_change_summary(current: &Value, proposed: &Value, change_type: &
             }
         }
         "buttons" => {
-            let count = proposed
-                .as_array()
-                .map(|a| a.len())
-                .unwrap_or(0);
+            let count = proposed.as_array().map(|a| a.len()).unwrap_or(0);
             summary.push(format!("{} buttons defined", count));
         }
         _ => {}
@@ -777,7 +797,8 @@ mod tests {
     #[test]
     fn change_summary_form() {
         let current = json!({ "sections": [{ "fields": [{"a": 1}] }] });
-        let proposed = json!({ "sections": [{ "fields": [{"a": 1}, {"b": 2}] }, { "fields": [] }] });
+        let proposed =
+            json!({ "sections": [{ "fields": [{"a": 1}, {"b": 2}] }, { "fields": [] }] });
         let summary = generate_change_summary(&current, &proposed, "form");
         assert!(!summary.is_empty());
     }

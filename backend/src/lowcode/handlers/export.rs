@@ -72,11 +72,7 @@ pub async fn export_data(
 
     // ── Resolve Field Permissions ──────────────────────────────────────
     let form = form_builder::get_form(&state.pool, operation.id).await?;
-    let all_fields: Vec<_> = form
-        .sections
-        .iter()
-        .flat_map(|s| s.fields.iter())
-        .collect();
+    let all_fields: Vec<_> = form.sections.iter().flat_map(|s| s.fields.iter()).collect();
 
     let mut hidden_fields: Vec<String> = Vec::new();
     let mut masked_fields: Vec<String> = Vec::new();
@@ -98,7 +94,12 @@ pub async fn export_data(
     }
 
     // ── Apply field filtering to records ───────────────────────────────
-    let filtered_records: Vec<(uuid::Uuid, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>, Value)> = records
+    let filtered_records: Vec<(
+        uuid::Uuid,
+        chrono::DateTime<chrono::Utc>,
+        chrono::DateTime<chrono::Utc>,
+        Value,
+    )> = records
         .into_iter()
         .map(|r| {
             let mut data = r.data;

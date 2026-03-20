@@ -470,6 +470,117 @@ pub async fn export_materials(
     Ok(csv_response(csv_data, "materials-export.csv"))
 }
 
+// --- Goods Receipts (GRN) ---
+pub async fn list_goods_receipts(
+    State(state): State<AppState>,
+    _role: RequireRole<MmRead>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<ApiResponse<PaginatedResponse<GoodsReceipt>>>, AppError> {
+    let result = services::list_goods_receipts(&state.pool, &params).await?;
+    Ok(Json(ApiResponse::success(result)))
+}
+
+#[derive(serde::Serialize)]
+pub struct GoodsReceiptDetail {
+    #[serde(flatten)]
+    pub receipt: GoodsReceipt,
+    pub items: Vec<GoodsReceiptItem>,
+}
+
+pub async fn get_goods_receipt(
+    State(state): State<AppState>,
+    _role: RequireRole<MmRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<GoodsReceiptDetail>>, AppError> {
+    let (receipt, items) = services::get_goods_receipt(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(GoodsReceiptDetail {
+        receipt,
+        items,
+    })))
+}
+
+pub async fn create_goods_receipt(
+    State(state): State<AppState>,
+    role: RequireRole<MmWrite>,
+    Json(input): Json<CreateGoodsReceipt>,
+) -> Result<Json<ApiResponse<GoodsReceipt>>, AppError> {
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let grn = services::create_goods_receipt(&state.pool, input, role.claims.sub).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "mm_goods_receipts",
+        grn.id,
+        "CREATE",
+        None,
+        serde_json::to_value(&grn).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        grn,
+        "Goods receipt created",
+    )))
+}
+
+pub async fn confirm_goods_receipt(
+    State(state): State<AppState>,
+    role: RequireRole<MmWrite>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<GoodsReceipt>>, AppError> {
+    let grn = services::confirm_goods_receipt(&state.pool, id, role.claims.sub).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "mm_goods_receipts",
+        grn.id,
+        "UPDATE",
+        serde_json::to_value(serde_json::json!({"status": "DRAFT"})).ok(),
+        serde_json::to_value(serde_json::json!({"status": &grn.status})).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    crate::notifications::services::notify(
+        &state.pool,
+        role.claims.sub,
+        "Goods Receipt Confirmed",
+        &format!("GRN {} confirmed - stock updated.", grn.grn_number),
+        "success",
+        Some("MM"),
+        Some(grn.id),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        grn,
+        "Goods receipt confirmed, stock updated",
+    )))
+}
+
+// --- Stock Reservations ---
+pub async fn list_stock_reservations(
+    State(state): State<AppState>,
+    _role: RequireRole<MmRead>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<ApiResponse<PaginatedResponse<StockReservation>>>, AppError> {
+    let result = services::list_stock_reservations(&state.pool, &params).await?;
+    Ok(Json(ApiResponse::success(result)))
+}
+
+// --- Stock Movements ---
+pub async fn list_stock_movements(
+    State(state): State<AppState>,
+    _role: RequireRole<MmRead>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<ApiResponse<PaginatedResponse<StockMovement>>>, AppError> {
+    let result = services::list_stock_movements(&state.pool, &params).await?;
+    Ok(Json(ApiResponse::success(result)))
+}
+
 // --- Goods Issue ---
 pub async fn goods_issue(
     State(state): State<AppState>,

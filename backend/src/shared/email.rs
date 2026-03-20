@@ -97,21 +97,19 @@ pub async fn send_template_email(
 
 /// List email templates
 pub async fn list_templates(pool: &PgPool) -> Result<Vec<EmailTemplate>, AppError> {
-    let templates = sqlx::query_as::<_, EmailTemplate>(
-        "SELECT * FROM email_templates ORDER BY template_code",
-    )
-    .fetch_all(pool)
-    .await?;
+    let templates =
+        sqlx::query_as::<_, EmailTemplate>("SELECT * FROM email_templates ORDER BY template_code")
+            .fetch_all(pool)
+            .await?;
     Ok(templates)
 }
 
 /// List email logs
 pub async fn list_email_logs(pool: &PgPool, limit: i64) -> Result<Vec<EmailLog>, AppError> {
-    let logs = sqlx::query_as::<_, EmailLog>(
-        "SELECT * FROM email_log ORDER BY created_at DESC LIMIT $1",
-    )
-    .bind(limit)
-    .fetch_all(pool)
-    .await?;
+    let logs =
+        sqlx::query_as::<_, EmailLog>("SELECT * FROM email_log ORDER BY created_at DESC LIMIT $1")
+            .bind(limit)
+            .fetch_all(pool)
+            .await?;
     Ok(logs)
 }

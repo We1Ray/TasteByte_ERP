@@ -211,6 +211,62 @@ pub async fn create_delivery(
     )))
 }
 
+// --- Ship Delivery ---
+pub async fn ship_delivery(
+    State(state): State<AppState>,
+    role: RequireRole<SdWrite>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Delivery>>, AppError> {
+    let delivery = services::ship_delivery(&state.pool, id, role.claims.sub).await?;
+
+    let _ = audit::log_change(
+        &state.pool,
+        "sd_deliveries",
+        delivery.id,
+        "UPDATE",
+        serde_json::to_value(serde_json::json!({"status": "CREATED"})).ok(),
+        serde_json::to_value(serde_json::json!({"status": &delivery.status})).ok(),
+        Some(role.claims.sub),
+    )
+    .await;
+
+    crate::notifications::services::notify(
+        &state.pool,
+        role.claims.sub,
+        "Delivery Shipped",
+        &format!("Delivery {} has been shipped.", delivery.delivery_number),
+        "success",
+        Some("SD"),
+        Some(delivery.id),
+    )
+    .await;
+
+    Ok(Json(ApiResponse::with_message(
+        delivery,
+        "Delivery marked as shipped",
+    )))
+}
+
+// --- Get Delivery Detail ---
+#[derive(serde::Serialize)]
+pub struct DeliveryDetail {
+    #[serde(flatten)]
+    pub delivery: Delivery,
+    pub items: Vec<DeliveryItem>,
+}
+
+pub async fn get_delivery(
+    State(state): State<AppState>,
+    _role: RequireRole<SdRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<DeliveryDetail>>, AppError> {
+    let (delivery, items) = services::get_delivery(&state.pool, id).await?;
+    Ok(Json(ApiResponse::success(DeliveryDetail {
+        delivery,
+        items,
+    })))
+}
+
 // --- SD Invoices ---
 pub async fn list_sd_invoices(
     State(state): State<AppState>,

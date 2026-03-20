@@ -65,13 +65,11 @@ pub async fn list_rules(
         .bind(op_id)
         .fetch_all(pool)
         .await?),
-        None => Ok(
-            sqlx::query_as::<_, OutputRule>(
-                "SELECT * FROM output_rules ORDER BY sort_order",
-            )
-            .fetch_all(pool)
-            .await?,
-        ),
+        None => Ok(sqlx::query_as::<_, OutputRule>(
+            "SELECT * FROM output_rules ORDER BY sort_order",
+        )
+        .fetch_all(pool)
+        .await?),
     }
 }
 
@@ -134,10 +132,7 @@ pub async fn fire_outputs(
             &rule.condition_operator,
             &rule.condition_value,
         ) {
-            let actual = data
-                .get(field)
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let actual = data.get(field).and_then(|v| v.as_str()).unwrap_or("");
             let matches = match op.as_str() {
                 "equals" => actual == val,
                 "not_equals" => actual != val,
@@ -196,10 +191,7 @@ pub async fn fire_outputs(
     }
 }
 
-pub async fn list_logs(
-    pool: &PgPool,
-    operation_id: Uuid,
-) -> Result<Vec<OutputLog>, AppError> {
+pub async fn list_logs(pool: &PgPool, operation_id: Uuid) -> Result<Vec<OutputLog>, AppError> {
     Ok(sqlx::query_as::<_, OutputLog>(
         "SELECT * FROM output_log WHERE operation_id = $1 ORDER BY executed_at DESC LIMIT 100",
     )

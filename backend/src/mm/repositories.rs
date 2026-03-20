@@ -508,6 +508,231 @@ async fn create_material_movement_inner(
     Ok(row)
 }
 
+// --- Goods Receipts (GRN) ---
+pub async fn list_goods_receipts(
+    pool: &PgPool,
+    params: &ListParams,
+) -> Result<Vec<GoodsReceipt>, AppError> {
+    let search_pattern = params.search_pattern();
+    let has_search = search_pattern.is_some();
+    let pattern = search_pattern.unwrap_or_default();
+
+    let has_status = params.status.is_some();
+    let status = params.status.clone().unwrap_or_default();
+
+    let rows = sqlx::query_as::<_, GoodsReceipt>(
+        r#"SELECT * FROM mm_goods_receipts
+           WHERE ($1 = false OR (grn_number ILIKE $2 OR COALESCE(notes, '') ILIKE $2))
+             AND ($3 = false OR status = $4)
+           ORDER BY created_at DESC
+           LIMIT $5 OFFSET $6"#,
+    )
+    .bind(has_search)
+    .bind(&pattern)
+    .bind(has_status)
+    .bind(&status)
+    .bind(params.per_page())
+    .bind(params.offset())
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn count_goods_receipts(pool: &PgPool, params: &ListParams) -> Result<i64, AppError> {
+    let search_pattern = params.search_pattern();
+    let has_search = search_pattern.is_some();
+    let pattern = search_pattern.unwrap_or_default();
+
+    let has_status = params.status.is_some();
+    let status = params.status.clone().unwrap_or_default();
+
+    let (count,): (i64,) = sqlx::query_as(
+        r#"SELECT COUNT(*) FROM mm_goods_receipts
+           WHERE ($1 = false OR (grn_number ILIKE $2 OR COALESCE(notes, '') ILIKE $2))
+             AND ($3 = false OR status = $4)"#,
+    )
+    .bind(has_search)
+    .bind(&pattern)
+    .bind(has_status)
+    .bind(&status)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+pub async fn get_goods_receipt(pool: &PgPool, id: Uuid) -> Result<GoodsReceipt, AppError> {
+    sqlx::query_as::<_, GoodsReceipt>("SELECT * FROM mm_goods_receipts WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Goods receipt not found".to_string()))
+}
+
+pub async fn get_goods_receipt_on_conn(
+    conn: &mut sqlx::PgConnection,
+    id: Uuid,
+) -> Result<GoodsReceipt, AppError> {
+    sqlx::query_as::<_, GoodsReceipt>("SELECT * FROM mm_goods_receipts WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Goods receipt not found".to_string()))
+}
+
+pub async fn get_goods_receipt_items(
+    pool: &PgPool,
+    grn_id: Uuid,
+) -> Result<Vec<GoodsReceiptItem>, AppError> {
+    let rows = sqlx::query_as::<_, GoodsReceiptItem>(
+        "SELECT * FROM mm_goods_receipt_items WHERE goods_receipt_id = $1 ORDER BY created_at",
+    )
+    .bind(grn_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn get_goods_receipt_items_on_conn(
+    conn: &mut sqlx::PgConnection,
+    grn_id: Uuid,
+) -> Result<Vec<GoodsReceiptItem>, AppError> {
+    let rows = sqlx::query_as::<_, GoodsReceiptItem>(
+        "SELECT * FROM mm_goods_receipt_items WHERE goods_receipt_id = $1 ORDER BY created_at",
+    )
+    .bind(grn_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn create_goods_receipt(
+    pool: &PgPool,
+    grn_number: &str,
+    input: &CreateGoodsReceipt,
+    user_id: Uuid,
+) -> Result<GoodsReceipt, AppError> {
+    let mut tx = pool.begin().await?;
+
+    let receipt_date = input
+        .receipt_date
+        .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+    let grn = sqlx::query_as::<_, GoodsReceipt>(
+        "INSERT INTO mm_goods_receipts (grn_number, purchase_order_id, vendor_id, receipt_date, warehouse_id, notes, received_by) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *"
+    )
+    .bind(grn_number)
+    .bind(input.purchase_order_id)
+    .bind(input.vendor_id)
+    .bind(receipt_date)
+    .bind(input.warehouse_id)
+    .bind(&input.notes)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    for item in &input.items {
+        sqlx::query(
+            "INSERT INTO mm_goods_receipt_items (goods_receipt_id, po_item_id, material_id, ordered_quantity, received_quantity, rejected_quantity, uom_id, batch_number, expiry_date, storage_bin, notes) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
+        )
+        .bind(grn.id)
+        .bind(item.po_item_id)
+        .bind(item.material_id)
+        .bind(item.ordered_quantity)
+        .bind(item.received_quantity)
+        .bind(item.rejected_quantity)
+        .bind(item.uom_id)
+        .bind(&item.batch_number)
+        .bind(item.expiry_date)
+        .bind(&item.storage_bin)
+        .bind(&item.notes)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(grn)
+}
+
+// --- Stock Reservations ---
+pub async fn list_stock_reservations(
+    pool: &PgPool,
+    params: &ListParams,
+) -> Result<Vec<StockReservation>, AppError> {
+    let has_status = params.status.is_some();
+    let status = params.status.clone().unwrap_or_default();
+
+    let rows = sqlx::query_as::<_, StockReservation>(
+        r#"SELECT * FROM mm_stock_reservations
+           WHERE ($1 = false OR status = $2)
+           ORDER BY created_at DESC
+           LIMIT $3 OFFSET $4"#,
+    )
+    .bind(has_status)
+    .bind(&status)
+    .bind(params.per_page())
+    .bind(params.offset())
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn count_stock_reservations(pool: &PgPool, params: &ListParams) -> Result<i64, AppError> {
+    let has_status = params.status.is_some();
+    let status = params.status.clone().unwrap_or_default();
+
+    let (count,): (i64,) = sqlx::query_as(
+        r#"SELECT COUNT(*) FROM mm_stock_reservations
+           WHERE ($1 = false OR status = $2)"#,
+    )
+    .bind(has_status)
+    .bind(&status)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+// --- Stock Movements ---
+pub async fn list_stock_movements(
+    pool: &PgPool,
+    params: &ListParams,
+) -> Result<Vec<StockMovement>, AppError> {
+    let search_pattern = params.search_pattern();
+    let has_search = search_pattern.is_some();
+    let pattern = search_pattern.unwrap_or_default();
+
+    let rows = sqlx::query_as::<_, StockMovement>(
+        r#"SELECT * FROM mm_stock_movements
+           WHERE ($1 = false OR (movement_type ILIKE $2 OR COALESCE(batch_number, '') ILIKE $2))
+           ORDER BY created_at DESC
+           LIMIT $3 OFFSET $4"#,
+    )
+    .bind(has_search)
+    .bind(&pattern)
+    .bind(params.per_page())
+    .bind(params.offset())
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn count_stock_movements(pool: &PgPool, params: &ListParams) -> Result<i64, AppError> {
+    let search_pattern = params.search_pattern();
+    let has_search = search_pattern.is_some();
+    let pattern = search_pattern.unwrap_or_default();
+
+    let (count,): (i64,) = sqlx::query_as(
+        r#"SELECT COUNT(*) FROM mm_stock_movements
+           WHERE ($1 = false OR (movement_type ILIKE $2 OR COALESCE(batch_number, '') ILIKE $2))"#,
+    )
+    .bind(has_search)
+    .bind(&pattern)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
 /// Reserve stock for a sales order confirmation
 pub async fn reserve_stock(
     pool: &PgPool,

@@ -310,6 +310,26 @@ pub async fn count_deliveries(pool: &PgPool, params: &ListParams) -> Result<i64,
     Ok(count)
 }
 
+pub async fn get_delivery(pool: &PgPool, id: Uuid) -> Result<Delivery, AppError> {
+    sqlx::query_as::<_, Delivery>("SELECT * FROM sd_deliveries WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Delivery not found".to_string()))
+}
+
+pub async fn get_delivery_items(
+    pool: &PgPool,
+    delivery_id: Uuid,
+) -> Result<Vec<DeliveryItem>, AppError> {
+    let rows =
+        sqlx::query_as::<_, DeliveryItem>("SELECT * FROM sd_delivery_items WHERE delivery_id = $1")
+            .bind(delivery_id)
+            .fetch_all(pool)
+            .await?;
+    Ok(rows)
+}
+
 pub async fn create_delivery(
     pool: &PgPool,
     delivery_number: &str,

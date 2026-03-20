@@ -224,6 +224,107 @@ pub struct ReceivePurchaseOrderItem {
     pub warehouse_id: Option<Uuid>,
 }
 
+// Goods Receipt Notes (GRN)
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct GoodsReceipt {
+    pub id: Uuid,
+    pub grn_number: String,
+    pub purchase_order_id: Option<Uuid>,
+    pub vendor_id: Option<Uuid>,
+    pub receipt_date: NaiveDate,
+    pub warehouse_id: Option<Uuid>,
+    pub status: String,
+    pub notes: Option<String>,
+    pub received_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct GoodsReceiptItem {
+    pub id: Uuid,
+    pub goods_receipt_id: Uuid,
+    pub po_item_id: Option<Uuid>,
+    pub material_id: Uuid,
+    pub ordered_quantity: Option<Decimal>,
+    pub received_quantity: Decimal,
+    pub rejected_quantity: Option<Decimal>,
+    pub uom_id: Option<Uuid>,
+    pub batch_number: Option<String>,
+    pub expiry_date: Option<NaiveDate>,
+    pub storage_bin: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateGoodsReceipt {
+    pub purchase_order_id: Option<Uuid>,
+    pub vendor_id: Option<Uuid>,
+    pub receipt_date: Option<NaiveDate>,
+    pub warehouse_id: Option<Uuid>,
+    pub notes: Option<String>,
+    #[validate(length(min = 1, message = "At least one item is required"))]
+    pub items: Vec<CreateGoodsReceiptItem>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CreateGoodsReceiptItem {
+    pub po_item_id: Option<Uuid>,
+    pub material_id: Uuid,
+    pub ordered_quantity: Option<Decimal>,
+    pub received_quantity: Decimal,
+    pub rejected_quantity: Option<Decimal>,
+    pub uom_id: Option<Uuid>,
+    pub batch_number: Option<String>,
+    pub expiry_date: Option<NaiveDate>,
+    pub storage_bin: Option<String>,
+    pub notes: Option<String>,
+}
+
+// Stock Reservation
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct StockReservation {
+    pub id: Uuid,
+    pub material_id: Uuid,
+    pub warehouse_id: Option<Uuid>,
+    pub reserved_quantity: Decimal,
+    pub reference_type: String,
+    pub reference_id: Uuid,
+    pub status: String,
+    pub reserved_by: Option<Uuid>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+// Stock Movement (unified ledger)
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct StockMovement {
+    pub id: Uuid,
+    pub material_id: Uuid,
+    pub warehouse_id: Option<Uuid>,
+    pub movement_type: String,
+    pub quantity: Decimal,
+    pub reference_type: Option<String>,
+    pub reference_id: Option<Uuid>,
+    pub batch_number: Option<String>,
+    pub notes: Option<String>,
+    pub created_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+// Fiscal Period
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct FiscalPeriod {
+    pub id: Uuid,
+    pub fiscal_year_id: Uuid,
+    pub period: i32,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+    pub is_closed: bool,
+    pub status: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

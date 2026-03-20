@@ -31,6 +31,8 @@ pub fn routes() -> Router<AppState> {
             "/deliveries",
             get(handlers::list_deliveries).post(handlers::create_delivery),
         )
+        .route("/deliveries/{id}", get(handlers::get_delivery))
+        .route("/deliveries/{id}/ship", post(handlers::ship_delivery))
         .route(
             "/invoices",
             get(handlers::list_sd_invoices).post(handlers::create_sd_invoice),

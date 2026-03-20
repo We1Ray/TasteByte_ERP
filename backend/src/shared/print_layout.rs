@@ -54,10 +54,7 @@ pub async fn get_layout(pool: &PgPool, layout_code: &str) -> Result<PrintLayout,
     .ok_or_else(|| AppError::NotFound("Print layout not found".to_string()))
 }
 
-pub async fn save_layout(
-    pool: &PgPool,
-    input: CreatePrintLayout,
-) -> Result<PrintLayout, AppError> {
+pub async fn save_layout(pool: &PgPool, input: CreatePrintLayout) -> Result<PrintLayout, AppError> {
     let layout = sqlx::query_as::<_, PrintLayout>(
         "INSERT INTO print_layouts (layout_code, name, description, operation_id, template_html, paper_size, orientation, header_html, footer_html) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \

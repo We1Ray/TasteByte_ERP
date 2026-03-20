@@ -3,7 +3,10 @@ use axum::Json;
 use uuid::Uuid;
 
 use crate::shared::types::{AppState, Claims};
-use crate::shared::{analytics, approval, auth_trace, bpm, cross_field, email, exchange_rate, output_determination, print_layout, report_builder, scheduler, webhook};
+use crate::shared::{
+    analytics, approval, auth_trace, bpm, cross_field, email, exchange_rate, output_determination,
+    print_layout, report_builder, scheduler, webhook,
+};
 use crate::shared::{ApiResponse, AppError};
 
 // -- User Preferences -------------------------------------------------------
@@ -42,12 +45,11 @@ pub async fn get_user_preferences(
     State(state): State<AppState>,
     claims: Claims,
 ) -> Result<Json<ApiResponse<UserPreference>>, AppError> {
-    let pref = sqlx::query_as::<_, UserPreference>(
-        "SELECT * FROM user_preferences WHERE user_id = $1",
-    )
-    .bind(claims.sub)
-    .fetch_optional(&state.pool)
-    .await?;
+    let pref =
+        sqlx::query_as::<_, UserPreference>("SELECT * FROM user_preferences WHERE user_id = $1")
+            .bind(claims.sub)
+            .fetch_optional(&state.pool)
+            .await?;
 
     match pref {
         Some(p) => Ok(Json(ApiResponse::success(p))),
@@ -229,10 +231,7 @@ pub fn init_start_time() {
 pub async fn system_health(State(state): State<AppState>) -> Result<Json<SystemHealth>, AppError> {
     let pool = &state.pool;
 
-    let uptime = START_TIME
-        .get()
-        .map(|t| t.elapsed().as_secs())
-        .unwrap_or(0);
+    let uptime = START_TIME.get().map(|t| t.elapsed().as_secs()).unwrap_or(0);
 
     let db_ok = sqlx::query("SELECT 1").execute(pool).await.is_ok();
     let pool_size = pool.size();
@@ -536,8 +535,7 @@ pub async fn create_transport_order(
     claims: Claims,
     Json(input): Json<CreateTransportOrder>,
 ) -> Result<Json<ApiResponse<TransportOrder>>, AppError> {
-    let transport_number =
-        crate::shared::number_range::next_number(&state.pool, "TRN").await?;
+    let transport_number = crate::shared::number_range::next_number(&state.pool, "TRN").await?;
     let order = sqlx::query_as::<_, TransportOrder>(
         "INSERT INTO transport_orders (transport_number, description, target_env, object_type, object_id, payload, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
     )
@@ -613,14 +611,9 @@ pub async fn submit_for_approval(
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok())
         .ok_or_else(|| AppError::Validation("record_id required".to_string()))?;
-    let instance = approval::submit_for_approval(
-        &state.pool,
-        matrix_id,
-        operation_id,
-        record_id,
-        claims.sub,
-    )
-    .await?;
+    let instance =
+        approval::submit_for_approval(&state.pool, matrix_id, operation_id, record_id, claims.sub)
+            .await?;
     Ok(Json(ApiResponse::success(instance)))
 }
 
@@ -635,8 +628,7 @@ pub async fn process_approval_action(
         .and_then(|v| v.as_str())
         .unwrap_or("APPROVE");
     let comment = input.get("comment").and_then(|v| v.as_str());
-    let instance =
-        approval::process_approval(&state.pool, id, action, claims.sub, comment).await?;
+    let instance = approval::process_approval(&state.pool, id, action, claims.sub, comment).await?;
     Ok(Json(ApiResponse::success(instance)))
 }
 
@@ -889,9 +881,7 @@ pub async fn update_number_range(
         .and_then(|v| v.as_i64())
         .map(|v| v as i32);
     let separator = input.get("separator").and_then(|v| v.as_str());
-    let fiscal = input
-        .get("fiscal_year_dependent")
-        .and_then(|v| v.as_bool());
+    let fiscal = input.get("fiscal_year_dependent").and_then(|v| v.as_bool());
     let active = input.get("is_active").and_then(|v| v.as_bool());
 
     let range = sqlx::query_as::<_, NumberRangeConfig>(
@@ -1036,13 +1026,8 @@ pub async fn download_import_template(
     .await?
     .ok_or_else(|| AppError::NotFound("Operation not found".to_string()))?;
 
-    let form =
-        crate::lowcode::services::form_builder::get_form(&state.pool, operation.id).await?;
-    let fields: Vec<_> = form
-        .sections
-        .iter()
-        .flat_map(|s| s.fields.iter())
-        .collect();
+    let form = crate::lowcode::services::form_builder::get_form(&state.pool, operation.id).await?;
+    let fields: Vec<_> = form.sections.iter().flat_map(|s| s.fields.iter()).collect();
 
     let mut wtr = csv::Writer::from_writer(Vec::new());
 
@@ -1080,10 +1065,7 @@ pub async fn download_import_template(
 
     Ok((
         [
-            (
-                header::CONTENT_TYPE,
-                "text/csv; charset=utf-8".to_string(),
-            ),
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8".to_string()),
             (
                 header::CONTENT_DISPOSITION,
                 format!("attachment; filename=\"{}\"", filename),
@@ -1095,31 +1077,67 @@ pub async fn download_import_template(
 }
 
 // ── Reports ────────────────────────────────────────────────────────
-pub async fn list_reports(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<report_builder::ReportDefinition>>>, AppError> {
-    Ok(Json(ApiResponse::success(report_builder::list_reports(&state.pool).await?)))
+pub async fn list_reports(
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<report_builder::ReportDefinition>>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        report_builder::list_reports(&state.pool).await?,
+    )))
 }
-pub async fn get_report(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<ApiResponse<report_builder::ReportDefinition>>, AppError> {
-    Ok(Json(ApiResponse::success(report_builder::get_report(&state.pool, id).await?)))
+pub async fn get_report(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<report_builder::ReportDefinition>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        report_builder::get_report(&state.pool, id).await?,
+    )))
 }
-pub async fn create_report(State(state): State<AppState>, claims: Claims, Json(input): Json<report_builder::CreateReport>) -> Result<Json<ApiResponse<report_builder::ReportDefinition>>, AppError> {
-    Ok(Json(ApiResponse::success(report_builder::create_report(&state.pool, input, claims.sub).await?)))
+pub async fn create_report(
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(input): Json<report_builder::CreateReport>,
+) -> Result<Json<ApiResponse<report_builder::ReportDefinition>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        report_builder::create_report(&state.pool, input, claims.sub).await?,
+    )))
 }
-pub async fn delete_report(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+pub async fn delete_report(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     report_builder::delete_report(&state.pool, id).await?;
-    Ok(Json(ApiResponse::success(serde_json::json!({"deleted":true}))))
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted":true}),
+    )))
 }
 
 // ── Analytics ──────────────────────────────────────────────────────
-pub async fn track_analytics_event(State(state): State<AppState>, claims: Claims, Json(input): Json<analytics::TrackEvent>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+pub async fn track_analytics_event(
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(input): Json<analytics::TrackEvent>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     analytics::track_event(&state.pool, claims.sub, input).await?;
-    Ok(Json(ApiResponse::success(serde_json::json!({"tracked":true}))))
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"tracked":true}),
+    )))
 }
-pub async fn get_analytics_summary(State(state): State<AppState>, Query(params): Query<serde_json::Value>) -> Result<Json<ApiResponse<Vec<analytics::UsageSummary>>>, AppError> {
+pub async fn get_analytics_summary(
+    State(state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Json<ApiResponse<Vec<analytics::UsageSummary>>>, AppError> {
     let days = params.get("days").and_then(|v| v.as_i64()).unwrap_or(30) as i32;
-    Ok(Json(ApiResponse::success(analytics::get_summary(&state.pool, days).await?)))
+    Ok(Json(ApiResponse::success(
+        analytics::get_summary(&state.pool, days).await?,
+    )))
 }
-pub async fn get_operation_analytics(State(state): State<AppState>, Path(operation_id): Path<Uuid>) -> Result<Json<ApiResponse<Vec<analytics::UsageSummary>>>, AppError> {
-    Ok(Json(ApiResponse::success(analytics::get_operation_stats(&state.pool, operation_id).await?)))
+pub async fn get_operation_analytics(
+    State(state): State<AppState>,
+    Path(operation_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<Vec<analytics::UsageSummary>>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        analytics::get_operation_stats(&state.pool, operation_id).await?,
+    )))
 }
 
 // ── Dashboard Templates ────────────────────────────────────────────
@@ -1134,26 +1152,57 @@ pub struct DashboardTemplate {
     pub is_active: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
-pub async fn list_dashboard_templates(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<DashboardTemplate>>>, AppError> {
-    Ok(Json(ApiResponse::success(sqlx::query_as::<_, DashboardTemplate>("SELECT * FROM dashboard_templates WHERE is_active=true ORDER BY category,name").fetch_all(&state.pool).await?)))
+pub async fn list_dashboard_templates(
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<DashboardTemplate>>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        sqlx::query_as::<_, DashboardTemplate>(
+            "SELECT * FROM dashboard_templates WHERE is_active=true ORDER BY category,name",
+        )
+        .fetch_all(&state.pool)
+        .await?,
+    )))
 }
 
 // ── Exchange Rates ─────────────────────────────────────────────────
-pub async fn list_exchange_rates(State(state): State<AppState>) -> Result<Json<ApiResponse<Vec<exchange_rate::ExchangeRate>>>, AppError> {
-    Ok(Json(ApiResponse::success(exchange_rate::list_rates(&state.pool).await?)))
+pub async fn list_exchange_rates(
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<exchange_rate::ExchangeRate>>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        exchange_rate::list_rates(&state.pool).await?,
+    )))
 }
-pub async fn create_exchange_rate(State(state): State<AppState>, Json(input): Json<exchange_rate::CreateExchangeRate>) -> Result<Json<ApiResponse<exchange_rate::ExchangeRate>>, AppError> {
-    Ok(Json(ApiResponse::success(exchange_rate::create_rate(&state.pool, input).await?)))
+pub async fn create_exchange_rate(
+    State(state): State<AppState>,
+    Json(input): Json<exchange_rate::CreateExchangeRate>,
+) -> Result<Json<ApiResponse<exchange_rate::ExchangeRate>>, AppError> {
+    Ok(Json(ApiResponse::success(
+        exchange_rate::create_rate(&state.pool, input).await?,
+    )))
 }
-pub async fn delete_exchange_rate(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+pub async fn delete_exchange_rate(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     exchange_rate::delete_rate(&state.pool, id).await?;
-    Ok(Json(ApiResponse::success(serde_json::json!({"deleted":true}))))
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted":true}),
+    )))
 }
-pub async fn convert_currency(State(state): State<AppState>, Query(params): Query<serde_json::Value>) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+pub async fn convert_currency(
+    State(state): State<AppState>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let from = params.get("from").and_then(|v| v.as_str()).unwrap_or("USD");
     let to = params.get("to").and_then(|v| v.as_str()).unwrap_or("TWD");
-    let amount: rust_decimal::Decimal = params.get("amount").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(rust_decimal::Decimal::ONE);
+    let amount: rust_decimal::Decimal = params
+        .get("amount")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(rust_decimal::Decimal::ONE);
     let date = chrono::Utc::now().date_naive();
     let result = exchange_rate::convert(&state.pool, from, to, amount, date).await?;
-    Ok(Json(ApiResponse::success(serde_json::json!({"from":from,"to":to,"amount":amount.to_string(),"result":result.to_string(),"date":date.to_string()}))))
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"from":from,"to":to,"amount":amount.to_string(),"result":result.to_string(),"date":date.to_string()}),
+    )))
 }

@@ -104,11 +104,9 @@ pub async fn list_matrices(
             .await?
         }
         None => {
-            sqlx::query_as::<_, ApprovalMatrix>(
-                "SELECT * FROM approval_matrices ORDER BY name",
-            )
-            .fetch_all(pool)
-            .await?
+            sqlx::query_as::<_, ApprovalMatrix>("SELECT * FROM approval_matrices ORDER BY name")
+                .fetch_all(pool)
+                .await?
         }
     };
     Ok(matrices)
@@ -209,18 +207,15 @@ pub async fn process_approval(
     acted_by: Uuid,
     comment: Option<&str>,
 ) -> Result<ApprovalInstance, AppError> {
-    let instance = sqlx::query_as::<_, ApprovalInstance>(
-        "SELECT * FROM approval_instances WHERE id = $1",
-    )
-    .bind(instance_id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Approval instance not found".to_string()))?;
+    let instance =
+        sqlx::query_as::<_, ApprovalInstance>("SELECT * FROM approval_instances WHERE id = $1")
+            .bind(instance_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Approval instance not found".to_string()))?;
 
     if instance.status != "PENDING" {
-        return Err(AppError::Validation(
-            "Approval is not pending".to_string(),
-        ));
+        return Err(AppError::Validation("Approval is not pending".to_string()));
     }
 
     let levels = sqlx::query_as::<_, ApprovalLevel>(
@@ -281,13 +276,12 @@ pub async fn get_instance_with_actions(
     pool: &PgPool,
     instance_id: Uuid,
 ) -> Result<(ApprovalInstance, Vec<ApprovalAction>), AppError> {
-    let instance = sqlx::query_as::<_, ApprovalInstance>(
-        "SELECT * FROM approval_instances WHERE id = $1",
-    )
-    .bind(instance_id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Not found".to_string()))?;
+    let instance =
+        sqlx::query_as::<_, ApprovalInstance>("SELECT * FROM approval_instances WHERE id = $1")
+            .bind(instance_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Not found".to_string()))?;
     let actions = sqlx::query_as::<_, ApprovalAction>(
         "SELECT * FROM approval_actions WHERE instance_id = $1 ORDER BY acted_at",
     )

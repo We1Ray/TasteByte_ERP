@@ -44,10 +44,9 @@ pub struct JobExecutionLog {
 }
 
 pub async fn list_jobs(pool: &PgPool) -> Result<Vec<ScheduledJob>, AppError> {
-    let jobs =
-        sqlx::query_as::<_, ScheduledJob>("SELECT * FROM scheduled_jobs ORDER BY job_name")
-            .fetch_all(pool)
-            .await?;
+    let jobs = sqlx::query_as::<_, ScheduledJob>("SELECT * FROM scheduled_jobs ORDER BY job_name")
+        .fetch_all(pool)
+        .await?;
     Ok(jobs)
 }
 

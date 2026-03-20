@@ -246,9 +246,8 @@ impl LlmClient {
                     for block in blocks {
                         match block {
                             ContentBlock::Text { text } => {
-                                openai_messages.push(
-                                    serde_json::json!({"role": m.role, "content": text}),
-                                );
+                                openai_messages
+                                    .push(serde_json::json!({"role": m.role, "content": text}));
                             }
                             ContentBlock::ToolResult {
                                 tool_use_id,

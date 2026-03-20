@@ -211,9 +211,7 @@ pub fn validate_cross_field_rules(
                 }
             }
             "equals" | "eq" => {
-                let s = source_val
-                    .map(|v| v.to_string())
-                    .unwrap_or_default();
+                let s = source_val.map(|v| v.to_string()).unwrap_or_default();
                 if let Some(ref tf) = rule.target_field {
                     let t = obj.get(tf).map(|v| v.to_string()).unwrap_or_default();
                     s == t
@@ -222,9 +220,7 @@ pub fn validate_cross_field_rules(
                 }
             }
             "not_equals" | "ne" => {
-                let s = source_val
-                    .map(|v| v.to_string())
-                    .unwrap_or_default();
+                let s = source_val.map(|v| v.to_string()).unwrap_or_default();
                 if let Some(ref tf) = rule.target_field {
                     let t = obj.get(tf).map(|v| v.to_string()).unwrap_or_default();
                     s != t
@@ -233,12 +229,7 @@ pub fn validate_cross_field_rules(
                 }
             }
             "not_empty" => source_val
-                .map(|v| {
-                    !v.is_null()
-                        && v.as_str()
-                            .map(|s| !s.is_empty())
-                            .unwrap_or(true)
-                })
+                .map(|v| !v.is_null() && v.as_str().map(|s| !s.is_empty()).unwrap_or(true))
                 .unwrap_or(false),
             "before" => {
                 let s = source_val.and_then(|v| v.as_str()).unwrap_or("");
@@ -279,8 +270,7 @@ pub fn apply_formulas(formulas: &[CalculationFormula], data: &mut serde_json::Va
     };
 
     for formula in formulas {
-        let result =
-            evaluate_formula(&formula.formula, &serde_json::Value::Object(obj.clone()));
+        let result = evaluate_formula(&formula.formula, &serde_json::Value::Object(obj.clone()));
         if let Some(val) = result {
             obj.insert(formula.target_field.clone(), val);
         }

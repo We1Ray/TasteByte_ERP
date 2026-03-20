@@ -105,10 +105,7 @@ pub fn routes() -> Router<AppState> {
             "/releases",
             get(handlers::releases::list_releases).post(handlers::releases::create_release),
         )
-        .route(
-            "/releases/{id}",
-            get(handlers::releases::get_release),
-        )
+        .route("/releases/{id}", get(handlers::releases::get_release))
         .route(
             "/releases/{id}/submit",
             put(handlers::releases::submit_release),
@@ -228,10 +225,7 @@ pub fn routes() -> Router<AppState> {
             post(handlers::import_export::bulk_import),
         )
         // Export
-        .route(
-            "/exec/{code}/export",
-            get(handlers::export::export_data),
-        )
+        .route("/exec/{code}/export", get(handlers::export::export_data))
         // Workflow Transition
         .route(
             "/exec/{code}/data/{id}/transition",
@@ -253,9 +247,6 @@ pub fn routes() -> Router<AppState> {
             get(handlers::buttons::get_buttons_by_code),
         )
         // AI Chat (Developer)
-        .route(
-            "/operations/{id}/ai/chat",
-            post(handlers::ai_chat::chat),
-        )
+        .route("/operations/{id}/ai/chat", post(handlers::ai_chat::chat))
         .route("/ai/status", get(handlers::ai_chat::ai_status))
 }

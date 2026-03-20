@@ -1,7 +1,7 @@
+use crate::shared::AppError;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::shared::AppError;
 
 #[derive(Debug, Deserialize)]
 pub struct TrackEvent {
@@ -33,7 +33,10 @@ pub async fn get_summary(pool: &PgPool, days: i32) -> Result<Vec<UsageSummary>, 
     ).bind(days).fetch_all(pool).await?)
 }
 
-pub async fn get_operation_stats(pool: &PgPool, operation_id: Uuid) -> Result<Vec<UsageSummary>, AppError> {
+pub async fn get_operation_stats(
+    pool: &PgPool,
+    operation_id: Uuid,
+) -> Result<Vec<UsageSummary>, AppError> {
     Ok(sqlx::query_as::<_, UsageSummary>(
         "SELECT event_type, COUNT(*) as count, COUNT(DISTINCT user_id) as unique_users FROM usage_analytics WHERE operation_id = $1 GROUP BY event_type ORDER BY count DESC"
     ).bind(operation_id).fetch_all(pool).await?)

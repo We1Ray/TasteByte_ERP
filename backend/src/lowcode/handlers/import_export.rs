@@ -88,10 +88,7 @@ pub async fn bulk_import(
                 errors: validation.errors,
             });
             if !input.skip_invalid {
-                errors.push(format!(
-                    "Record at index {} has validation errors",
-                    idx
-                ));
+                errors.push(format!("Record at index {} has validation errors", idx));
             }
         }
     }

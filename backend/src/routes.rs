@@ -279,10 +279,7 @@ fn system_routes() -> Router<AppState> {
         // Global search
         .route("/search", get(admin_api::global_search))
         // Email management
-        .route(
-            "/email/templates",
-            get(admin_api::list_email_templates),
-        )
+        .route("/email/templates", get(admin_api::list_email_templates))
         .route("/email/logs", get(admin_api::list_email_logs_handler))
         // Scheduled jobs
         .route(
@@ -299,10 +296,7 @@ fn system_routes() -> Router<AppState> {
             "/webhooks",
             get(admin_api::list_webhooks_handler).post(admin_api::create_webhook_handler),
         )
-        .route(
-            "/webhooks/{id}",
-            delete(admin_api::delete_webhook_handler),
-        )
+        .route("/webhooks/{id}", delete(admin_api::delete_webhook_handler))
         // Print layouts
         .route(
             "/print/layouts",
@@ -387,15 +381,9 @@ fn system_routes() -> Router<AppState> {
         )
         // Number Range Config
         .route("/number-ranges", get(admin_api::list_number_ranges))
-        .route(
-            "/number-ranges/{id}",
-            put(admin_api::update_number_range),
-        )
+        .route("/number-ranges/{id}", put(admin_api::update_number_range))
         // Auth Trace
-        .route(
-            "/auth-trace/{user_id}",
-            get(admin_api::get_auth_trace),
-        )
+        .route("/auth-trace/{user_id}", get(admin_api::get_auth_trace))
         .route(
             "/auth-trace/{user_id}/denials",
             get(admin_api::get_auth_denials),

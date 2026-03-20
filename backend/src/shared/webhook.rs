@@ -77,19 +77,18 @@ pub async fn delete_webhook(pool: &PgPool, webhook_id: Uuid) -> Result<(), AppEr
 
 /// Fire a webhook event to all matching webhooks
 pub async fn fire_event(pool: &PgPool, event_type: &str, payload: &serde_json::Value) {
-    let hooks: Vec<Webhook> = match sqlx::query_as(
-        "SELECT * FROM webhooks WHERE is_active = true AND $1 = ANY(events)",
-    )
-    .bind(event_type)
-    .fetch_all(pool)
-    .await
-    {
-        Ok(h) => h,
-        Err(e) => {
-            tracing::warn!("Failed to fetch webhooks for event {}: {}", event_type, e);
-            return;
-        }
-    };
+    let hooks: Vec<Webhook> =
+        match sqlx::query_as("SELECT * FROM webhooks WHERE is_active = true AND $1 = ANY(events)")
+            .bind(event_type)
+            .fetch_all(pool)
+            .await
+        {
+            Ok(h) => h,
+            Err(e) => {
+                tracing::warn!("Failed to fetch webhooks for event {}: {}", event_type, e);
+                return;
+            }
+        };
 
     for hook in hooks {
         let url = hook.url.clone();

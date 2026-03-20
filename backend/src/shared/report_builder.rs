@@ -1,7 +1,7 @@
+use crate::shared::AppError;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::shared::AppError;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ReportDefinition {
@@ -39,17 +39,26 @@ pub struct CreateReport {
 }
 
 pub async fn list_reports(pool: &PgPool) -> Result<Vec<ReportDefinition>, AppError> {
-    Ok(sqlx::query_as::<_, ReportDefinition>("SELECT * FROM report_definitions ORDER BY name")
-        .fetch_all(pool).await?)
+    Ok(
+        sqlx::query_as::<_, ReportDefinition>("SELECT * FROM report_definitions ORDER BY name")
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
 pub async fn get_report(pool: &PgPool, id: Uuid) -> Result<ReportDefinition, AppError> {
     sqlx::query_as::<_, ReportDefinition>("SELECT * FROM report_definitions WHERE id = $1")
-        .bind(id).fetch_optional(pool).await?
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
         .ok_or_else(|| AppError::NotFound("Report not found".into()))
 }
 
-pub async fn create_report(pool: &PgPool, input: CreateReport, created_by: Uuid) -> Result<ReportDefinition, AppError> {
+pub async fn create_report(
+    pool: &PgPool,
+    input: CreateReport,
+    created_by: Uuid,
+) -> Result<ReportDefinition, AppError> {
     Ok(sqlx::query_as::<_, ReportDefinition>(
         "INSERT INTO report_definitions (report_code,name,description,operation_id,data_source_sql,columns,filters,chart_config,default_sort,page_size,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *"
     ).bind(&input.report_code).bind(&input.name).bind(&input.description).bind(input.operation_id)
@@ -59,6 +68,9 @@ pub async fn create_report(pool: &PgPool, input: CreateReport, created_by: Uuid)
 }
 
 pub async fn delete_report(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM report_definitions WHERE id=$1").bind(id).execute(pool).await?;
+    sqlx::query("DELETE FROM report_definitions WHERE id=$1")
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }

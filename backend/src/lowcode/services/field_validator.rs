@@ -178,8 +178,7 @@ pub async fn validate_for_update(
 
         // Unique check (exclude self)
         if field.is_unique {
-            if let Err(e) =
-                check_unique(pool, operation_id, field_name, val, Some(record_id)).await
+            if let Err(e) = check_unique(pool, operation_id, field_name, val, Some(record_id)).await
             {
                 errors.push(FieldError {
                     field_name: field_name.clone(),
@@ -273,7 +272,7 @@ fn check_type(
         "dropdown" | "radio_group" => val.is_string() || val.is_number(),
         "multi_select" => val.is_array(),
         "file" => true, // File handled separately
-        _ => true,       // Unknown types pass through
+        _ => true,      // Unknown types pass through
     };
     if ok {
         None
