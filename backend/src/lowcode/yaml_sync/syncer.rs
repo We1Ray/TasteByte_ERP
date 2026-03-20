@@ -254,9 +254,10 @@ async fn sync_form(
                   placeholder, help_text, validation_regex, validation_message, \
                   min_value, max_value, min_length, max_length, \
                   db_table, db_column, data_source_sql, display_column, value_column, \
-                  visibility_rule, field_config, sort_order, column_span) \
+                  visibility_rule, field_config, sort_order, column_span, \
+                  sub_table_columns, lookup_fill_fields, required_rule) \
                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,\
-                         $19,$20,$21,$22,$23,$24,$25,$26,$27) \
+                         $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) \
                  ON CONFLICT (section_id, field_name) DO UPDATE SET \
                  field_label=$4, field_type=$5, is_required=$6, is_unique=$7, \
                  is_searchable=$8, default_value=$9, default_value_sql=$10, \
@@ -264,7 +265,8 @@ async fn sync_form(
                  min_value=$15, max_value=$16, min_length=$17, max_length=$18, \
                  db_table=$19, db_column=$20, data_source_sql=$21, display_column=$22, \
                  value_column=$23, visibility_rule=$24, field_config=$25, sort_order=$26, \
-                 column_span=$27, updated_at=NOW()",
+                 column_span=$27, sub_table_columns=$28, lookup_fill_fields=$29, \
+                 required_rule=$30, updated_at=NOW()",
             )
             .bind(fld_id)
             .bind(sec_id)
@@ -293,6 +295,9 @@ async fn sync_form(
             .bind(&config)
             .bind(fidx as i32)
             .bind(field.column_span.unwrap_or(1))
+            .bind(&field.sub_table_columns)
+            .bind(&field.lookup_fill_fields)
+            .bind(&field.required_rule)
             .execute(&mut **tx)
             .await
             .map_err(|e| e.to_string())?;

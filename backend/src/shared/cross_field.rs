@@ -278,32 +278,82 @@ pub fn apply_formulas(formulas: &[CalculationFormula], data: &mut serde_json::Va
 }
 
 fn evaluate_formula(formula: &str, data: &serde_json::Value) -> Option<serde_json::Value> {
-    let formula = formula.trim();
-    // Support simple operations: field1 * field2, field1 + field2, etc.
-    for op in &["*", "+", "-", "/"] {
-        if let Some(pos) = formula.find(op) {
-            let left = formula[..pos].trim();
-            let right = formula[pos + 1..].trim();
-            let left_val = resolve_value(left, data)?;
-            let right_val = resolve_value(right, data)?;
-            let result = match *op {
-                "*" => left_val * right_val,
-                "+" => left_val + right_val,
-                "-" => left_val - right_val,
-                "/" => {
-                    if right_val != 0.0 {
-                        left_val / right_val
-                    } else {
-                        return None;
-                    }
-                }
-                _ => return None,
-            };
-            return Some(serde_json::json!(result));
+    let result = eval_expression(formula.trim(), data)?;
+    Some(serde_json::json!(result))
+}
+
+// Two-pass evaluation: first handle +/-, then handle */÷ within each term
+fn eval_expression(expr: &str, data: &serde_json::Value) -> Option<f64> {
+    // Split by + and - (keeping operators), but not inside parentheses
+    let mut terms: Vec<f64> = Vec::new();
+    let mut ops: Vec<char> = Vec::new();
+
+    let mut current_term = String::new();
+    for ch in expr.chars() {
+        if (ch == '+' || ch == '-') && !current_term.is_empty() {
+            terms.push(eval_term(current_term.trim(), data)?);
+            ops.push(ch);
+            current_term = String::new();
+        } else {
+            current_term.push(ch);
         }
     }
-    // Single field reference
-    resolve_value(formula, data).map(|v| serde_json::json!(v))
+    if !current_term.is_empty() {
+        terms.push(eval_term(current_term.trim(), data)?);
+    }
+
+    if terms.is_empty() {
+        return None;
+    }
+
+    let mut result = terms[0];
+    for (i, op) in ops.iter().enumerate() {
+        match op {
+            '+' => result += terms[i + 1],
+            '-' => result -= terms[i + 1],
+            _ => {}
+        }
+    }
+    Some(result)
+}
+
+// Evaluate a term (handles * and /)
+fn eval_term(term: &str, data: &serde_json::Value) -> Option<f64> {
+    let mut factors: Vec<f64> = Vec::new();
+    let mut ops: Vec<char> = Vec::new();
+
+    let mut current = String::new();
+    for ch in term.chars() {
+        if (ch == '*' || ch == '/') && !current.is_empty() {
+            factors.push(resolve_value(current.trim(), data)?);
+            ops.push(ch);
+            current = String::new();
+        } else {
+            current.push(ch);
+        }
+    }
+    if !current.is_empty() {
+        factors.push(resolve_value(current.trim(), data)?);
+    }
+
+    if factors.is_empty() {
+        return None;
+    }
+
+    let mut result = factors[0];
+    for (i, op) in ops.iter().enumerate() {
+        match op {
+            '*' => result *= factors[i + 1],
+            '/' => {
+                if factors[i + 1] == 0.0 {
+                    return None;
+                }
+                result /= factors[i + 1];
+            }
+            _ => {}
+        }
+    }
+    Some(result)
 }
 
 fn resolve_value(token: &str, data: &serde_json::Value) -> Option<f64> {

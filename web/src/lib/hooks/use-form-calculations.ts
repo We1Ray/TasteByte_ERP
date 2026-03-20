@@ -10,37 +10,76 @@ interface Formula {
 
 function evaluateFormula(formula: string, data: Record<string, unknown>): number | null {
   try {
-    // Simple expression evaluator supporting: field references, numbers, +, -, *, /
-    const tokens = formula.split(/([+\-*/])/).map(t => t.trim()).filter(Boolean);
-
-    if (tokens.length === 1) {
-      // Single value
-      return resolveValue(tokens[0], data);
-    }
-
-    // Evaluate left to right (respecting * and / precedence would be more complex)
-    // For now, simple left-to-right evaluation
-    let result = resolveValue(tokens[0], data);
-    if (result === null) return null;
-
-    for (let i = 1; i < tokens.length; i += 2) {
-      const op = tokens[i];
-      const right = resolveValue(tokens[i + 1], data);
-      if (right === null) return null;
-
-      switch (op) {
-        case '+': result += right; break;
-        case '-': result -= right; break;
-        case '*': result *= right; break;
-        case '/': result = right !== 0 ? result / right : null; break;
-      }
-      if (result === null) return null;
-    }
-
-    return Math.round(result * 100) / 100; // Round to 2 decimal places
+    return evalExpression(formula.trim(), data);
   } catch {
     return null;
   }
+}
+
+// Two-pass: handle +/- first, then */ within terms
+function evalExpression(expr: string, data: Record<string, unknown>): number | null {
+  const terms: number[] = [];
+  const ops: string[] = [];
+  let current = '';
+
+  for (const ch of expr) {
+    if ((ch === '+' || ch === '-') && current.trim().length > 0) {
+      const val = evalTerm(current.trim(), data);
+      if (val === null) return null;
+      terms.push(val);
+      ops.push(ch);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) {
+    const val = evalTerm(current.trim(), data);
+    if (val === null) return null;
+    terms.push(val);
+  }
+
+  if (terms.length === 0) return null;
+  let result = terms[0];
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i] === '+') result += terms[i + 1];
+    else if (ops[i] === '-') result -= terms[i + 1];
+  }
+  return Math.round(result * 100) / 100;
+}
+
+function evalTerm(term: string, data: Record<string, unknown>): number | null {
+  const factors: number[] = [];
+  const ops: string[] = [];
+  let current = '';
+
+  for (const ch of term) {
+    if ((ch === '*' || ch === '/') && current.trim().length > 0) {
+      const val = resolveValue(current.trim(), data);
+      if (val === null) return null;
+      factors.push(val);
+      ops.push(ch);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) {
+    const val = resolveValue(current.trim(), data);
+    if (val === null) return null;
+    factors.push(val);
+  }
+
+  if (factors.length === 0) return null;
+  let result = factors[0];
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i] === '*') result *= factors[i + 1];
+    else if (ops[i] === '/') {
+      if (factors[i + 1] === 0) return null;
+      result /= factors[i + 1];
+    }
+  }
+  return result;
 }
 
 function resolveValue(token: string, data: Record<string, unknown>): number | null {

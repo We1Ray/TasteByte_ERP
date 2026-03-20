@@ -78,6 +78,9 @@ pub async fn export_operation(pool: &PgPool, operation_code: &str) -> Result<Str
                     } else {
                         None
                     },
+                    sub_table_columns: f.field.sub_table_columns.clone(),
+                    lookup_fill_fields: f.field.lookup_fill_fields.clone(),
+                    required_rule: f.field.required_rule.clone(),
                     options: if f.options.is_empty() {
                         None
                     } else {

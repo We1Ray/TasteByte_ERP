@@ -65,6 +65,9 @@ pub struct FieldDef {
     pub visibility_rule: Option<serde_json::Value>,
     pub config: Option<serde_json::Value>,
     pub options: Option<Vec<FieldOptionDef>>,
+    pub sub_table_columns: Option<serde_json::Value>,
+    pub lookup_fill_fields: Option<serde_json::Value>,
+    pub required_rule: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
